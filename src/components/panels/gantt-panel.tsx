@@ -146,7 +146,8 @@ export function GanttPanel() {
         label: '%',
         width: 50,
         align: 'center',
-        template: (task: GanttTask) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        template: (task: any) => {
           if (task.type === 'project') return ''
           return Math.round((task.progress || 0) * 100) + '%'
         },
@@ -166,18 +167,22 @@ export function GanttPanel() {
     }
 
     // Custom task rendering for assignee avatars
-    gantt.templates.task_text = function (start: Date, end: Date, task: GanttTask) {
-      if (task.$custom_assignees) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    gantt.templates.task_text = function (...args: any[]) {
+      const task = args[2] as GanttTask
+      if (task?.$custom_assignees) {
         return task.text + ' ' + task.$custom_assignees
       }
-      return task.text || ''
+      return task?.text || ''
     }
 
     // Scope status indicator
-    gantt.templates.task_class = function (start: Date, end: Date, task: GanttTask) {
-      if (task.$scope_status === 'session-done') return 'scope-done'
-      if (task.$scope_status === 'session-scheduled') return 'scope-scheduled'
-      if (task.$scope_status === 'not-started') return 'scope-not-started'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    gantt.templates.task_class = function (...args: any[]) {
+      const task = args[2] as GanttTask
+      if (task?.$scope_status === 'session-done') return 'scope-done'
+      if (task?.$scope_status === 'session-scheduled') return 'scope-scheduled'
+      if (task?.$scope_status === 'not-started') return 'scope-not-started'
       return ''
     }
 

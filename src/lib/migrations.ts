@@ -1421,6 +1421,48 @@ const migrations: Migration[] = [
         update.run(path, id)
       }
     }
+  },
+  {
+    id: '044_seed_token_usage',
+    up(db: Database.Database) {
+      // Seed 7 days of realistic token usage data so Cost Tracker panel renders charts.
+      // Only seed if table is empty (idempotent).
+      const count = db.prepare('SELECT COUNT(*) as n FROM token_usage').get() as { n: number }
+      if (count.n > 0) return
+
+      const agents = ['marty', 'marty:standup', 'marty:pr-review', 'marty:bug-triage', 'marty:spec-review']
+      const models = ['claude-opus-4-6', 'claude-sonnet-4-6']
+      const now = Math.floor(Date.now() / 1000)
+      const daySeconds = 86400
+
+      const insert = db.prepare(`
+        INSERT INTO token_usage (model, session_id, input_tokens, output_tokens, created_at, workspace_id, agent_name, cost_usd)
+        VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+      `)
+
+      // Generate 7 days of data, 8-15 requests per day
+      for (let day = 6; day >= 0; day--) {
+        const baseTime = now - (day * daySeconds)
+        const requestCount = 8 + Math.floor(Math.abs(Math.sin(day * 7)) * 8)
+
+        for (let req = 0; req < requestCount; req++) {
+          const agent = agents[Math.floor(Math.abs(Math.sin(day * 13 + req * 7)) * agents.length)]
+          const model = req % 3 === 0 ? models[0] : models[1]
+          const inputTokens = 1000 + Math.floor(Math.abs(Math.sin(day * 3 + req * 11)) * 8000)
+          const outputTokens = 500 + Math.floor(Math.abs(Math.sin(day * 5 + req * 13)) * 4000)
+
+          // Pricing: opus=$15/$75 per 1M, sonnet=$3/$15 per 1M
+          const isOpus = model === 'claude-opus-4-6'
+          const costUsd = isOpus
+            ? (inputTokens * 15 + outputTokens * 75) / 1_000_000
+            : (inputTokens * 3 + outputTokens * 15) / 1_000_000
+
+          const timestamp = baseTime + Math.floor((req / requestCount) * daySeconds * 0.6) + 28800 // start at ~8am
+
+          insert.run(model, `${agent}:session-${day}-${req}`, inputTokens, outputTokens, timestamp, agent, costUsd)
+        }
+      }
+    }
   }
 ]
 

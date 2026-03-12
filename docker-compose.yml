@@ -6,12 +6,19 @@ services:
       - "${MC_PORT:-3100}:${PORT:-3000}"
     environment:
       - PORT=${PORT:-3000}
+      - HOME=/app
     env_file:
       - path: .env
         required: false
     volumes:
       - mc-data:/app/.data
       - ./data:/app/data
+      # Mount OpenClaw host directories (read-only) for skills, memory, config
+      - /home/openclaw/.openclaw/skills:/app/.openclaw/skills:ro
+      - /home/openclaw/.openclaw/openclaw.json:/app/.openclaw/openclaw.json:ro
+      - /home/openclaw/.openclaw/workspace-marty:/app/.openclaw/workspace-marty:ro
+      - /home/openclaw/.openclaw/memory:/app/.openclaw/memory:ro
+      - /home/openclaw/.openclaw/cron:/app/.openclaw/cron:ro
     read_only: true
     tmpfs:
       - /tmp

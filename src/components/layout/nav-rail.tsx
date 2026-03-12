@@ -25,6 +25,15 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
+    id: 'tryps',
+    label: 'TRYPS',
+    items: [
+      { id: 'gantt', label: 'Gantt', icon: <GanttIcon />, priority: true },
+      { id: 'tryps-team', label: 'Team', icon: <TrypsTeamIcon />, priority: true },
+      { id: 'tryps-office', label: 'Virtual Office', icon: <TrypsVirtualOfficeIcon />, priority: false },
+    ],
+  },
+  {
     id: 'core',
     items: [
       { id: 'overview', label: 'Overview', icon: <OverviewIcon />, priority: true, essential: true },
@@ -1435,6 +1444,38 @@ function PluginIcon() {
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M6 2v3M10 2v3M4 5h8a1 1 0 011 1v7a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1z" />
       <circle cx="8" cy="10" r="1.5" />
+    </svg>
+  )
+}
+
+// Tryps custom icons
+function GanttIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 3h6M2 7h10M2 11h4M2 15h8" />
+    </svg>
+  )
+}
+
+function TrypsTeamIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="5" cy="4" r="2" />
+      <circle cx="11" cy="4" r="2" />
+      <path d="M1 12c0-2.2 1.8-4 4-4s4 1.8 4 4" />
+      <path d="M8 12c0-2.2 1.8-4 4-4s3 1.8 3 4" />
+    </svg>
+  )
+}
+
+function TrypsVirtualOfficeIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="1" width="14" height="14" rx="2" />
+      <circle cx="5" cy="6" r="1.5" />
+      <circle cx="11" cy="6" r="1.5" />
+      <circle cx="8" cy="11" r="1.5" />
+      <path d="M5 7.5v1M11 7.5v1M8 12.5v1" />
     </svg>
   )
 }

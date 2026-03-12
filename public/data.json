@@ -1,0 +1,259 @@
+{
+  "updatedAt": "2026-03-12T16:00:00Z",
+  "deadline": "2026-04-02",
+
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "Phase 1: Core App",
+      "startDate": "2026-03-09",
+      "targetEndDate": "2026-03-21",
+      "color": "#06b6d4",
+      "totalTasks": 45,
+      "completedTasks": 29,
+      "progress": 0.64,
+      "assignees": [
+        { "name": "Asif", "avatar": "A", "tasksCompleted": 12, "tasksTotal": 18 },
+        { "name": "Nadeem", "avatar": "N", "tasksCompleted": 10, "tasksTotal": 15 },
+        { "name": "Krisna", "avatar": "K", "tasksCompleted": 3, "tasksTotal": 8 },
+        { "name": "Arslan", "avatar": "Ar", "tasksCompleted": 4, "tasksTotal": 4 }
+      ]
+    },
+    {
+      "id": "phase-2",
+      "name": "Phase 2: Stripe + Linq",
+      "startDate": "2026-03-21",
+      "targetEndDate": "2026-03-27",
+      "color": "#8b5cf6",
+      "totalTasks": 0,
+      "completedTasks": 0,
+      "progress": 0,
+      "assignees": []
+    },
+    {
+      "id": "phase-3",
+      "name": "Phase 3: Agent Layer",
+      "startDate": "2026-03-27",
+      "targetEndDate": "2026-03-31",
+      "color": "#f59e0b",
+      "totalTasks": 0,
+      "completedTasks": 0,
+      "progress": 0,
+      "assignees": []
+    },
+    {
+      "id": "phase-3.5",
+      "name": "Phase 3.5: Agent Platform",
+      "startDate": "2026-03-31",
+      "targetEndDate": "2026-04-02",
+      "color": "#ef4444",
+      "totalTasks": 0,
+      "completedTasks": 0,
+      "progress": 0,
+      "assignees": []
+    }
+  ],
+
+  "scopes": [
+    {
+      "id": "notifications",
+      "name": "Notifications",
+      "deepWorkDate": "2026-03-12",
+      "deepWorkDone": true,
+      "startDate": "2026-03-12",
+      "endDate": null,
+      "status": "session-done",
+      "calendarEventId": "mt61qjbhq4uiufs4ntrumu3pi0"
+    },
+    {
+      "id": "referral",
+      "name": "Referral Plan",
+      "deepWorkDate": "2026-03-12",
+      "deepWorkDone": true,
+      "startDate": "2026-03-12",
+      "endDate": null,
+      "status": "session-done",
+      "calendarEventId": "8pk7pkf03gum6ucv8ejq74t1ao"
+    },
+    {
+      "id": "brand",
+      "name": "Brand FRD",
+      "deepWorkDate": "2026-03-12",
+      "deepWorkDone": false,
+      "startDate": "2026-03-12",
+      "endDate": null,
+      "status": "session-scheduled"
+    },
+    {
+      "id": "socials",
+      "name": "Social Media Setup",
+      "deepWorkDate": "2026-03-12",
+      "deepWorkDone": false,
+      "startDate": "2026-03-12",
+      "endDate": null,
+      "status": "session-scheduled"
+    },
+    {
+      "id": "budget",
+      "name": "Budget & Launch Timeline",
+      "deepWorkDate": "2026-03-13",
+      "deepWorkDone": false,
+      "startDate": "2026-03-13",
+      "endDate": null,
+      "status": "session-scheduled"
+    },
+    {
+      "id": "fundraising",
+      "name": "Fundraising Objectives",
+      "deepWorkDate": "2026-03-13",
+      "deepWorkDone": false,
+      "startDate": "2026-03-13",
+      "endDate": null,
+      "status": "session-scheduled"
+    },
+    {
+      "id": "ff-round",
+      "name": "Friends & Family Round",
+      "deepWorkDate": "2026-03-13",
+      "deepWorkDone": false,
+      "startDate": "2026-03-13",
+      "endDate": null,
+      "status": "session-scheduled"
+    },
+    {
+      "id": "pitch-deck",
+      "name": "Pitch Deck",
+      "deepWorkDate": null,
+      "deepWorkDone": false,
+      "startDate": null,
+      "endDate": null,
+      "status": "not-started"
+    },
+    {
+      "id": "tooltips",
+      "name": "Tooltips / User Education",
+      "deepWorkDate": null,
+      "deepWorkDone": false,
+      "startDate": null,
+      "endDate": null,
+      "status": "not-started"
+    }
+  ],
+
+  "team": [
+    {
+      "name": "Asif",
+      "role": "Dev Lead",
+      "github": "asifraza1013",
+      "status": "yellow",
+      "commits24h": 0,
+      "openPRs": 0,
+      "merged7d": 5,
+      "prCycleHours": 4,
+      "currentTask": "Trip Management — Figma Design (Overview / Tracker)",
+      "currentTaskStatus": "Needs Spec",
+      "daysInStatus": 1,
+      "flags": ["No open PRs — last merge was March 7"]
+    },
+    {
+      "name": "Nadeem",
+      "role": "Developer",
+      "github": "Nadimkhan120",
+      "status": "green",
+      "commits24h": 7,
+      "openPRs": 2,
+      "merged7d": 10,
+      "prCycleHours": 5.8,
+      "currentTask": "Trip Vibe + DNA — Unify Question Bank",
+      "currentTaskStatus": "For Testing",
+      "daysInStatus": 1,
+      "flags": []
+    },
+    {
+      "name": "Andreas",
+      "role": "QA Lead",
+      "github": "realcc",
+      "status": "red",
+      "commits24h": 0,
+      "openPRs": 0,
+      "merged7d": 0,
+      "prCycleHours": null,
+      "currentTask": "QA — no active tasks found",
+      "currentTaskStatus": null,
+      "daysInStatus": 0,
+      "flags": ["No ClickUp tasks assigned", "No GitHub activity"]
+    },
+    {
+      "name": "Krisna",
+      "role": "Designer",
+      "github": null,
+      "status": "yellow",
+      "commits24h": null,
+      "openPRs": null,
+      "merged7d": null,
+      "prCycleHours": null,
+      "currentTask": "Itinerary Tab — Figma Design",
+      "currentTaskStatus": "To Do",
+      "daysInStatus": 2,
+      "flags": ["15 tasks assigned but all in 'Needs Spec' or 'To Do'"]
+    },
+    {
+      "name": "Arslan",
+      "role": "Designer",
+      "github": null,
+      "status": "yellow",
+      "commits24h": null,
+      "openPRs": null,
+      "merged7d": null,
+      "prCycleHours": null,
+      "currentTask": "Activities Tab — Figma Design (10 Screens)",
+      "currentTaskStatus": "To Do",
+      "daysInStatus": 2,
+      "flags": ["Only 1 task assigned"]
+    },
+    {
+      "name": "Muneeb",
+      "role": "Developer",
+      "github": null,
+      "status": "green",
+      "commits24h": null,
+      "openPRs": null,
+      "merged7d": null,
+      "prCycleHours": null,
+      "currentTask": null,
+      "currentTaskStatus": null,
+      "daysInStatus": 0,
+      "flags": []
+    }
+  ],
+
+  "marty": {
+    "status": "active",
+    "lastCronRun": "2026-03-12T16:00:00Z",
+    "nextCronRun": "2026-03-12T18:00:00Z",
+    "pendingRecommendations": [
+      {
+        "type": "deep-work",
+        "scope": "pitch-deck",
+        "reason": "Pitch deck has no session scheduled. Recommend 1hr before March 20.",
+        "suggestedDate": "2026-03-17"
+      }
+    ],
+    "recentActions": [
+      { "time": "2026-03-12T14:00:00Z", "action": "Posted standup reminder to #standup" },
+      { "time": "2026-03-12T12:00:00Z", "action": "Updated dashboard data" }
+    ]
+  },
+
+  "calendar": {
+    "deepWorkSessions": [
+      { "date": "2026-03-12", "title": "Notifications Overview - Deep Work", "scopeId": "notifications" },
+      { "date": "2026-03-12", "title": "Referral Plan - Deep Work", "scopeId": "referral" },
+      { "date": "2026-03-12", "title": "Brand FRD - Deep Work", "scopeId": "brand" },
+      { "date": "2026-03-12", "title": "Socials Setup", "scopeId": "socials" },
+      { "date": "2026-03-13", "title": "Strategy: Budget & Launch Timeline", "scopeId": "budget" },
+      { "date": "2026-03-13", "title": "Strategy: Fundraising Objectives", "scopeId": "fundraising" },
+      { "date": "2026-03-13", "title": "Strategy: Friends & Family Round Sizing", "scopeId": "ff-round" }
+    ]
+  }
+}

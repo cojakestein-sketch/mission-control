@@ -37,6 +37,9 @@ import { NodesPanel } from '@/components/panels/nodes-panel'
 import { ExecApprovalPanel } from '@/components/panels/exec-approval-panel'
 import { ChatPagePanel } from '@/components/panels/chat-page-panel'
 import { ChatPanel } from '@/components/chat/chat-panel'
+import { GanttPanel } from '@/components/panels/gantt-panel'
+import { TeamPanel } from '@/components/panels/team-panel'
+import { TrypsOfficePanel } from '@/components/panels/tryps-office-panel'
 import { getPluginPanel } from '@/lib/plugins'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { LocalModeBanner } from '@/components/layout/local-mode-banner'
@@ -547,6 +550,12 @@ function ContentRouter({ tab }: { tab: string }) {
       return <ExecApprovalPanel />
     case 'chat':
       return <ChatPagePanel />
+    case 'gantt':
+      return <GanttPanel />
+    case 'tryps-team':
+      return <TeamPanel />
+    case 'tryps-office':
+      return <TrypsOfficePanel />
     default: {
       return renderPluginPanel(tab)
     }

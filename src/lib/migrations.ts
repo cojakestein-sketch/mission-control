@@ -1463,6 +1463,22 @@ const migrations: Migration[] = [
         }
       }
     }
+  },
+  {
+    id: '045_phase_frd_paths',
+    up(db: Database.Database) {
+      // Set frd_path for phase workstreams (P1, P2, P3)
+      const phaseFrds: Record<string, string> = {
+        'p1-core': 'docs/frds/p1-core.md',
+        'p2-payments': 'docs/frds/p2-payments.md',
+        'p3-agents': 'docs/frds/p3-agents.md',
+      }
+
+      const update = db.prepare('UPDATE workstreams SET frd_path = ? WHERE id = ? AND frd_path IS NULL')
+      for (const [id, path] of Object.entries(phaseFrds)) {
+        update.run(path, id)
+      }
+    }
   }
 ]
 

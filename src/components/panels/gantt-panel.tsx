@@ -86,7 +86,8 @@ export function GanttPanel() {
     if (typeof window === 'undefined') return
 
     // Check if already loaded
-    if ((window as Record<string, unknown>).gantt) {
+    if (// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(window as any).gantt) {
       setGanttReady(true)
       return
     }
@@ -118,7 +119,8 @@ export function GanttPanel() {
   useEffect(() => {
     if (!ganttReady || !data || !ganttRef.current) return
 
-    const gantt = (window as Record<string, unknown>).gantt as GanttStatic
+    const gantt = // eslint-disable-next-line @typescript-eslint/no-explicit-any
+(window as any).gantt as GanttStatic
     if (!gantt) return
 
     // Configure

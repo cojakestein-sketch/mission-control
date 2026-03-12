@@ -31,11 +31,17 @@ interface Recommendation {
   suggestedDate: string
 }
 
+interface TeamMember {
+  name: string
+  status: 'green' | 'yellow' | 'red'
+}
+
 interface TrypsData {
   updatedAt: string
   deadline: string
   phases: Phase[]
   scopes: Scope[]
+  team: TeamMember[]
   marty: {
     status: string
     lastCronRun: string
@@ -279,15 +285,16 @@ export function GanttPanel() {
   }
 
   const deadlineDays = daysUntil(data.deadline)
-  const healthyCount = data.team?.filter((t: { status: string }) => t.status === 'green').length ?? 0
-  const totalCount = data.team?.length ?? 0
+  const teamArr = data.team || []
+  const healthyCount = teamArr.filter(t => t.status === 'green').length
+  const totalCount = teamArr.length
 
   return (
     <div className="flex flex-col h-full">
       {/* Summary bar */}
       <div className="flex items-center gap-6 px-4 py-3 border-b border-border bg-card/50">
         <div className="flex items-center gap-2">
-          {data.team?.map((t: { name: string; status: string }) => (
+          {teamArr.map((t) => (
             <span
               key={t.name}
               className={`w-3 h-3 rounded-full ${

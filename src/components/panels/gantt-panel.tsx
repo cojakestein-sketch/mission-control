@@ -58,7 +58,6 @@ export function GanttPanel() {
   }, [fetchWorkstreams])
 
   const handleStatusChange = useCallback(async (workstreamId: string, newStatus: string) => {
-    // Optimistic update
     setWorkstreams(prev =>
       prev.map(ws =>
         ws.id === workstreamId
@@ -74,6 +73,29 @@ export function GanttPanel() {
         body: JSON.stringify({ status: newStatus }),
       })
     } catch {
+      fetchWorkstreams()
+    }
+  }, [fetchWorkstreams])
+
+  const handleDragReschedule = useCallback(async (workstreamId: string, newStart: string, newEnd: string) => {
+    // Optimistic update
+    setWorkstreams(prev =>
+      prev.map(ws =>
+        ws.id === workstreamId
+          ? { ...ws, startDate: newStart, endDate: newEnd }
+          : ws
+      )
+    )
+
+    try {
+      const res = await fetch(`/api/workstreams/${workstreamId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startDate: newStart, endDate: newEnd }),
+      })
+      if (!res.ok) throw new Error('Failed')
+    } catch {
+      // Snap back — refetch to revert
       fetchWorkstreams()
     }
   }, [fetchWorkstreams])
@@ -139,6 +161,7 @@ export function GanttPanel() {
           workstreams={workstreams}
           onTaskToggle={handleTaskToggle}
           onStatusChange={handleStatusChange}
+          onDragReschedule={handleDragReschedule}
         />
       </div>
     </div>

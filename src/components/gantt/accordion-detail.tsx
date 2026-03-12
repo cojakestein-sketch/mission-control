@@ -15,12 +15,14 @@ export function AccordionDetail({ workstream, onTaskToggle, onFrdLoaded }: Accor
   const progressPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
 
   const [frdLoading, setFrdLoading] = useState(false)
+  const [frdFetched, setFrdFetched] = useState(false)
   const [frdError, setFrdError] = useState<string | null>(null)
 
-  // Fetch FRD on mount if path exists but content is empty
+  // Fetch FRD on mount if path exists but content is empty (once per mount)
   useEffect(() => {
-    if (workstream.frdPath && !workstream.frdContent && !frdLoading) {
+    if (workstream.frdPath && !workstream.frdContent && !frdLoading && !frdFetched) {
       setFrdLoading(true)
+      setFrdFetched(true)
       setFrdError(null)
       fetch(`/api/frd/${workstream.id}`)
         .then(res => res.json())
@@ -32,7 +34,7 @@ export function AccordionDetail({ workstream, onTaskToggle, onFrdLoaded }: Accor
         .catch(err => setFrdError(String(err)))
         .finally(() => setFrdLoading(false))
     }
-  }, [workstream.id, workstream.frdPath, workstream.frdContent, frdLoading, onFrdLoaded])
+  }, [workstream.id, workstream.frdPath, workstream.frdContent, frdLoading, frdFetched, onFrdLoaded])
 
   // GitHub "Create FRD" URL
   const frdRepo = 'cojakestein-sketch/tryps-docs'

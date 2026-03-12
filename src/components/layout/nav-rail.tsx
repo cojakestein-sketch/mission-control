@@ -30,7 +30,6 @@ const navGroups: NavGroup[] = [
     items: [
       { id: 'gantt', label: 'Gantt', icon: <GanttIcon />, priority: true },
       { id: 'tryps-team', label: 'Team', icon: <TrypsTeamIcon />, priority: true },
-      { id: 'tryps-office', label: 'Virtual Office', icon: <TrypsVirtualOfficeIcon />, priority: false },
     ],
   },
   {
@@ -54,7 +53,6 @@ const navGroups: NavGroup[] = [
       { id: 'cost-tracker', label: 'Cost Tracker', icon: <TokensIcon />, priority: false },
       { id: 'nodes', label: 'Nodes', icon: <NodesIcon />, priority: false },
       { id: 'exec-approvals', label: 'Approvals', icon: <ApprovalsIcon />, priority: false },
-      { id: 'office', label: 'Office', icon: <OfficeIcon />, priority: false },
     ],
   },
   {
@@ -195,8 +193,8 @@ export function NavRail() {
         <div className={`flex items-center shrink-0 ${sidebarExpanded ? 'px-3 py-3 gap-2.5' : 'flex-col py-3 gap-2'}`}>
           <div className="w-9 h-9 rounded-lg overflow-hidden bg-background border border-border/50 flex items-center justify-center shrink-0 hover:border-void-cyan/40 hover:glow-cyan transition-smooth">
             <Image
-              src="/brand/mc-logo-128.png"
-              alt="Mission Control logo"
+              src="/brand/tryps-logo.png"
+              alt="Tryps logo"
               width={36}
               height={36}
               className="w-full h-full object-cover"
@@ -204,7 +202,7 @@ export function NavRail() {
           </div>
           {sidebarExpanded && (
             <div className="flex items-baseline gap-2 truncate flex-1 min-w-0">
-              <span className="text-sm font-semibold text-foreground truncate">Mission Control</span>
+              <span className="text-sm font-semibold text-foreground truncate">Tryps</span>
               <span className="text-2xs text-muted-foreground font-mono-tight shrink-0">v{APP_VERSION}</span>
             </div>
           )}

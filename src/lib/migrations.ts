@@ -1262,6 +1262,144 @@ const migrations: Migration[] = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_gateway_health_logs_gateway_id ON gateway_health_logs(gateway_id)`)
       db.exec(`CREATE INDEX IF NOT EXISTS idx_gateway_health_logs_probed_at ON gateway_health_logs(probed_at)`)
     }
+  },
+  {
+    id: '042_workstreams',
+    up(db: Database.Database) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS workstreams (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          category TEXT NOT NULL DEFAULT 'scope',
+          assignee_id TEXT,
+          start_date TEXT NOT NULL,
+          end_date TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'not_started',
+          color TEXT,
+          frd_path TEXT,
+          frd_content TEXT,
+          frd_synced_at TEXT,
+          progress REAL DEFAULT 0,
+          sort_order INTEGER DEFAULT 0,
+          deep_work_completed INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `)
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS workstream_tasks (
+          id TEXT PRIMARY KEY,
+          workstream_id TEXT NOT NULL REFERENCES workstreams(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'todo',
+          assignee_id TEXT,
+          due_date TEXT,
+          clickup_task_id TEXT,
+          sort_order INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `)
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS workstream_meetings (
+          id TEXT PRIMARY KEY,
+          workstream_id TEXT REFERENCES workstreams(id) ON DELETE SET NULL,
+          title TEXT NOT NULL,
+          start_time TEXT NOT NULL,
+          end_time TEXT NOT NULL,
+          attendees TEXT,
+          meet_link TEXT,
+          gcal_event_id TEXT UNIQUE,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `)
+
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_workstream_tasks_ws ON workstream_tasks(workstream_id)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_workstream_meetings_ws ON workstream_meetings(workstream_id)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_workstream_meetings_gcal ON workstream_meetings(gcal_event_id)`)
+
+      // Seed with real Tryps workstreams
+      const now = new Date().toISOString()
+
+      // -- Phases --
+      const phases = [
+        { id: 'p1-core', name: 'P1: Core App', start: '2026-03-09', end: '2026-03-21', color: '#D9071C', status: 'in_progress', progress: 0.65, order: 0 },
+        { id: 'p2-payments', name: 'P2: Stripe + Linq', start: '2026-03-22', end: '2026-03-30', color: '#e53e3e', status: 'not_started', progress: 0, order: 1 },
+        { id: 'p3-agents', name: 'P3: Agent Layer', start: '2026-03-30', end: '2026-04-02', color: '#c53030', status: 'not_started', progress: 0, order: 2 },
+      ]
+
+      // -- Scopes --
+      const scopes = [
+        { id: 'auth-system', name: 'Auth & Onboarding', start: '2026-03-09', end: '2026-03-15', color: '#2563eb', status: 'in_progress', progress: 0.8, order: 10, assignee: 'asif' },
+        { id: 'expense-tracking', name: 'Expense Tracking', start: '2026-03-12', end: '2026-03-20', color: '#059669', status: 'in_progress', progress: 0.35, order: 11, assignee: 'nadeem' },
+        { id: 'invite-flow', name: 'Invite Flow', start: '2026-03-10', end: '2026-03-16', color: '#7c3aed', status: 'in_progress', progress: 0.5, order: 12, assignee: 'asif' },
+        { id: 'trip-detail', name: 'Trip Detail Tabs', start: '2026-03-14', end: '2026-03-22', color: '#d97706', status: 'not_started', progress: 0, order: 13, assignee: 'nadeem' },
+        { id: 'notifications', name: 'Notifications', start: '2026-03-18', end: '2026-03-25', color: '#0891b2', status: 'not_started', progress: 0, order: 14, assignee: 'muneeb' },
+        { id: 'explore-globe', name: 'Explore & Globe Hub', start: '2026-03-20', end: '2026-03-28', color: '#4f46e5', status: 'not_started', progress: 0, order: 15 },
+        { id: 'design-system', name: 'Design System', start: '2026-03-09', end: '2026-03-30', color: '#c026d3', status: 'in_progress', progress: 0.2, order: 16, assignee: 'krisna' },
+        { id: 'qa-testing', name: 'QA & Testing', start: '2026-03-15', end: '2026-04-02', color: '#65a30d', status: 'not_started', progress: 0, order: 17, assignee: 'andreas' },
+      ]
+
+      const insertWs = db.prepare(`
+        INSERT OR IGNORE INTO workstreams (id, name, category, assignee_id, start_date, end_date, status, color, progress, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      for (const p of phases) {
+        insertWs.run(p.id, p.name, 'phase', null, p.start, p.end, p.status, p.color, p.progress, p.order, now, now)
+      }
+      for (const s of scopes) {
+        insertWs.run(s.id, s.name, 'scope', s.assignee || null, s.start, s.end, s.status, s.color, s.progress, s.order, now, now)
+      }
+
+      // Seed sub-tasks
+      const insertTask = db.prepare(`
+        INSERT OR IGNORE INTO workstream_tasks (id, workstream_id, title, status, assignee_id, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      const tasks = [
+        // Auth
+        { id: 't-auth-1', ws: 'auth-system', title: 'Phone OTP flow', status: 'done', assignee: 'asif' },
+        { id: 't-auth-2', ws: 'auth-system', title: 'Profile setup screen', status: 'done', assignee: 'asif' },
+        { id: 't-auth-3', ws: 'auth-system', title: 'Onboarding gate', status: 'done', assignee: 'asif' },
+        { id: 't-auth-4', ws: 'auth-system', title: 'Display name fallback chain', status: 'in_progress', assignee: 'asif' },
+        { id: 't-auth-5', ws: 'auth-system', title: 'Deep link callback handler', status: 'todo', assignee: 'asif' },
+        // Expenses
+        { id: 't-exp-1', ws: 'expense-tracking', title: 'Add expense form', status: 'done', assignee: 'nadeem' },
+        { id: 't-exp-2', ws: 'expense-tracking', title: 'Expense list view', status: 'in_progress', assignee: 'nadeem' },
+        { id: 't-exp-3', ws: 'expense-tracking', title: 'Split logic (equal/custom)', status: 'todo', assignee: 'nadeem' },
+        { id: 't-exp-4', ws: 'expense-tracking', title: 'Settlement ledger', status: 'todo', assignee: 'nadeem' },
+        { id: 't-exp-5', ws: 'expense-tracking', title: 'Receipt photo upload', status: 'todo', assignee: 'nadeem' },
+        // Invite flow
+        { id: 't-inv-1', ws: 'invite-flow', title: 'Deep link generation', status: 'done', assignee: 'asif' },
+        { id: 't-inv-2', ws: 'invite-flow', title: 'Join trip handler', status: 'in_progress', assignee: 'asif' },
+        { id: 't-inv-3', ws: 'invite-flow', title: 'Share sheet integration', status: 'todo', assignee: 'asif' },
+        { id: 't-inv-4', ws: 'invite-flow', title: 'iMessage preview card', status: 'todo', assignee: 'asif' },
+        // Design system
+        { id: 't-des-1', ws: 'design-system', title: 'Trip card component in Figma', status: 'done', assignee: 'krisna' },
+        { id: 't-des-2', ws: 'design-system', title: 'Tab bar & nav design', status: 'in_progress', assignee: 'krisna' },
+        { id: 't-des-3', ws: 'design-system', title: 'Expense screens design', status: 'todo', assignee: 'krisna' },
+      ]
+
+      tasks.forEach((t, i) => {
+        insertTask.run(t.id, t.ws, t.title, t.status, t.assignee || null, i, now, now)
+      })
+
+      // Recalculate progress for seeded workstreams
+      const wsIds = [...phases.map(p => p.id), ...scopes.map(s => s.id)]
+      for (const wsId of wsIds) {
+        const row = db.prepare(`
+          SELECT COUNT(*) as total, SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done
+          FROM workstream_tasks WHERE workstream_id = ?
+        `).get(wsId) as { total: number; done: number }
+        if (row.total > 0) {
+          db.prepare('UPDATE workstreams SET progress = ? WHERE id = ?').run(row.done / row.total, wsId)
+        }
+      }
+    }
   }
 ]
 

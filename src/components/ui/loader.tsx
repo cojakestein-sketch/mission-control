@@ -136,8 +136,8 @@ function PageLoader({ steps }: { steps?: InitStep[] }) {
           <div className="absolute inset-0 flex items-center justify-center opacity-0 animate-mc-fade-in">
             <div className="animate-float" style={{ animationDelay: '2.7s' }}>
               <Image
-                src="/brand/mc-logo-128.png"
-                alt="Mission Control"
+                src="/brand/tryps-logo.png"
+                alt="Tryps"
                 width={56}
                 height={56}
                 priority
@@ -151,10 +151,10 @@ function PageLoader({ steps }: { steps?: InitStep[] }) {
         {/* Title */}
         <div className="flex flex-col items-center gap-1">
           <h1 className="font-mono text-sm tracking-[0.2em] uppercase text-foreground font-medium">
-            Mission Control
+            Tryps Mission Control
           </h1>
           <p className="text-2xs text-muted-foreground/60">
-            Agent Orchestration
+            Command Center
           </p>
         </div>
 

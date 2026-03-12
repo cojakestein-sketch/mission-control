@@ -774,6 +774,64 @@
   --surface-3: 40 20% 82%;
 }
 
+.tryps {
+  /* Primary: Tryps Red */
+  --primary: 352 93% 44%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Background: Cool light gray */
+  --background: 216 27% 97%;
+  --foreground: 220 15% 12%;
+
+  /* Cards: Clean white */
+  --card: 0 0% 100%;
+  --card-foreground: 220 15% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 15% 12%;
+
+  /* Secondary */
+  --secondary: 216 18% 93%;
+  --secondary-foreground: 220 15% 12%;
+
+  /* Muted */
+  --muted: 216 14% 93%;
+  --muted-foreground: 220 8% 46%;
+
+  /* Accent: Light red tint */
+  --accent: 352 30% 96%;
+  --accent-foreground: 352 93% 38%;
+
+  /* Destructive */
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+
+  /* Border */
+  --border: 216 14% 88%;
+  --input: 216 14% 88%;
+  --ring: 352 93% 44%;
+
+  /* Status colors */
+  --success: 149 40% 35%;
+  --success-foreground: 0 0% 98%;
+  --warning: 28 78% 48%;
+  --warning-foreground: 0 0% 9%;
+  --info: 200 40% 50%;
+  --info-foreground: 0 0% 98%;
+
+  /* Tryps accent palette */
+  --void-cyan: 200 40% 45%;
+  --void-mint: 149 40% 35%;
+  --void-amber: 28 78% 52%;
+  --void-violet: 270 40% 50%;
+  --void-crimson: 352 93% 44%;
+
+  /* Surface hierarchy */
+  --surface-0: 216 27% 97%;
+  --surface-1: 216 20% 95%;
+  --surface-2: 216 16% 92%;
+  --surface-3: 216 12% 88%;
+}
+
 /* Themed backgrounds */
 .synthwave-bg {
   background-image:

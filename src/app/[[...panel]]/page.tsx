@@ -26,7 +26,7 @@ import { IntegrationsPanel } from '@/components/panels/integrations-panel'
 import { AlertRulesPanel } from '@/components/panels/alert-rules-panel'
 import { MultiGatewayPanel } from '@/components/panels/multi-gateway-panel'
 import { SuperAdminPanel } from '@/components/panels/super-admin-panel'
-import { OfficePanel } from '@/components/panels/office-panel'
+// OfficePanel removed — Virtual Office killed in v3 rebrand
 import { GitHubSyncPanel } from '@/components/panels/github-sync-panel'
 import { SkillsPanel } from '@/components/panels/skills-panel'
 import { LocalAgentsDocPanel } from '@/components/panels/local-agents-doc-panel'
@@ -39,7 +39,7 @@ import { ChatPagePanel } from '@/components/panels/chat-page-panel'
 import { ChatPanel } from '@/components/chat/chat-panel'
 import { GanttPanel } from '@/components/panels/gantt-panel'
 import { TeamPanel } from '@/components/panels/team-panel'
-import { TrypsOfficePanel } from '@/components/panels/tryps-office-panel'
+// TrypsOfficePanel removed — Virtual Office killed in v3 rebrand
 import { getPluginPanel } from '@/lib/plugins'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { LocalModeBanner } from '@/components/layout/local-mode-banner'
@@ -532,7 +532,7 @@ function ContentRouter({ tab }: { tab: string }) {
     case 'github':
       return <GitHubSyncPanel />
     case 'office':
-      return <OfficePanel />
+      return <Dashboard /> /* Virtual Office removed */
     case 'skills':
       return <SkillsPanel />
     case 'channels':
@@ -555,7 +555,7 @@ function ContentRouter({ tab }: { tab: string }) {
     case 'tryps-team':
       return <TeamPanel />
     case 'tryps-office':
-      return <TrypsOfficePanel />
+      return <Dashboard /> /* Virtual Office removed */
     default: {
       return renderPluginPanel(tab)
     }

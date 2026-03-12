@@ -23,6 +23,7 @@ interface GanttChartProps {
   onTaskToggle: (taskId: string, newStatus: 'todo' | 'done') => void
   onStatusChange?: (workstreamId: string, newStatus: string) => void
   onDragReschedule?: (workstreamId: string, newStart: string, newEnd: string) => void
+  onFrdLoaded?: (workstreamId: string, content: string) => void
 }
 
 const LABEL_WIDTH = 220
@@ -39,7 +40,7 @@ const horizontalOnly: Modifier = ({ transform }) => ({
 // Toast state (module-level for simplicity)
 let toastTimeout: ReturnType<typeof setTimeout> | null = null
 
-export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragReschedule }: GanttChartProps) {
+export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragReschedule, onFrdLoaded }: GanttChartProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [dragDeltaX, setDragDeltaX] = useState(0)
@@ -275,6 +276,7 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
                         isExpanded={expandedIds.has(ws.id)}
                         onToggle={() => toggleExpand(ws.id)}
                         onTaskToggle={onTaskToggle}
+                        onFrdLoaded={onFrdLoaded}
                         isDragging={activeDragId === ws.id}
                         dragDeltaX={activeDragId === ws.id ? dragDeltaX : 0}
                       />
@@ -296,6 +298,7 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
                         isExpanded={expandedIds.has(ws.id)}
                         onToggle={() => toggleExpand(ws.id)}
                         onTaskToggle={onTaskToggle}
+                        onFrdLoaded={onFrdLoaded}
                         isDragging={activeDragId === ws.id}
                         dragDeltaX={activeDragId === ws.id ? dragDeltaX : 0}
                       />
@@ -397,6 +400,7 @@ function WorkstreamRow({
   isExpanded,
   onToggle,
   onTaskToggle,
+  onFrdLoaded,
   isDragging,
   dragDeltaX,
 }: {
@@ -407,6 +411,7 @@ function WorkstreamRow({
   isExpanded: boolean
   onToggle: () => void
   onTaskToggle: (taskId: string, newStatus: 'todo' | 'done') => void
+  onFrdLoaded?: (workstreamId: string, content: string) => void
   isDragging: boolean
   dragDeltaX: number
 }) {
@@ -448,7 +453,7 @@ function WorkstreamRow({
       {isExpanded && (
         <div className="relative" style={{ height: 180 }}>
           <div className="absolute inset-x-2 inset-y-0 overflow-visible">
-            <AccordionDetail workstream={workstream} onTaskToggle={onTaskToggle} />
+            <AccordionDetail workstream={workstream} onTaskToggle={onTaskToggle} onFrdLoaded={onFrdLoaded} />
           </div>
         </div>
       )}

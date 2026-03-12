@@ -1400,6 +1400,27 @@ const migrations: Migration[] = [
         }
       }
     }
+  },
+  {
+    id: '043_frd_paths',
+    up(db: Database.Database) {
+      // Set frd_path for all scope workstreams pointing to tryps-docs repo
+      const frdPaths: Record<string, string> = {
+        'auth-system': 'docs/frds/auth-system.md',
+        'expense-tracking': 'docs/frds/expense-tracking.md',
+        'invite-flow': 'docs/frds/invite-flow.md',
+        'trip-detail': 'docs/frds/trip-detail.md',
+        'notifications': 'docs/frds/notifications.md',
+        'explore-globe': 'docs/frds/explore-globe.md',
+        'design-system': 'docs/frds/design-system.md',
+        'qa-testing': 'docs/frds/qa-testing.md',
+      }
+
+      const update = db.prepare('UPDATE workstreams SET frd_path = ? WHERE id = ? AND frd_path IS NULL')
+      for (const [id, path] of Object.entries(frdPaths)) {
+        update.run(path, id)
+      }
+    }
   }
 ]
 

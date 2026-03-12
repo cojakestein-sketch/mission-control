@@ -77,6 +77,16 @@ export function GanttPanel() {
     }
   }, [fetchWorkstreams])
 
+  const handleFrdLoaded = useCallback((workstreamId: string, content: string) => {
+    setWorkstreams(prev =>
+      prev.map(ws =>
+        ws.id === workstreamId
+          ? { ...ws, frdContent: content }
+          : ws
+      )
+    )
+  }, [])
+
   const handleDragReschedule = useCallback(async (workstreamId: string, newStart: string, newEnd: string) => {
     // Optimistic update
     setWorkstreams(prev =>
@@ -162,6 +172,7 @@ export function GanttPanel() {
           onTaskToggle={handleTaskToggle}
           onStatusChange={handleStatusChange}
           onDragReschedule={handleDragReschedule}
+          onFrdLoaded={handleFrdLoaded}
         />
       </div>
     </div>

@@ -97,6 +97,18 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
   const phases = workstreams.filter(ws => ws.category === 'phase')
   const scopes = workstreams.filter(ws => ws.category === 'scope')
 
+  // Group scopes by parent phase
+  const scopesByPhase = useMemo(() => {
+    const map = new Map<string, typeof scopes>()
+    for (const scope of scopes) {
+      const parentId = scope.parentId || '_unassigned'
+      const arr = map.get(parentId) || []
+      arr.push(scope)
+      map.set(parentId, arr)
+    }
+    return map
+  }, [scopes])
+
   // Scroll to today on mount
   useEffect(() => {
     const container = scrollContainerRef.current
@@ -110,14 +122,25 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
 
   const getContentHeight = () => {
     let h = 0
-    const groups = [{ items: phases }, { items: scopes }]
-    for (const group of groups) {
-      h += 32
-      for (const ws of group.items) {
-        h += ROW_HEIGHT
-        if (expandedIds.has(ws.id)) {
-          h += 180
+    for (const phase of phases) {
+      h += 32 // phase group header
+      h += ROW_HEIGHT // phase row
+      if (expandedIds.has(phase.id)) h += 180
+      const childScopes = scopesByPhase.get(phase.id) || []
+      if (childScopes.length > 0) {
+        for (const scope of childScopes) {
+          h += ROW_HEIGHT
+          if (expandedIds.has(scope.id)) h += 180
         }
+      }
+    }
+    // Unassigned scopes
+    const unassigned = scopesByPhase.get('_unassigned') || []
+    if (unassigned.length > 0) {
+      h += 32
+      for (const ws of unassigned) {
+        h += ROW_HEIGHT
+        if (expandedIds.has(ws.id)) h += 180
       }
     }
     return Math.max(h, 400)
@@ -191,29 +214,42 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
               <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Workstream</span>
             </div>
 
-            {phases.length > 0 && (
-              <>
-                <div className="h-8 flex items-center px-3 bg-red-50/50 border-b border-gray-100">
-                  <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider">Phases</span>
-                </div>
-                {phases.map(ws => (
+            {phases.map(phase => {
+              const childScopes = scopesByPhase.get(phase.id) || []
+              return (
+                <div key={phase.id}>
+                  {/* Phase header */}
+                  <div className="h-8 flex items-center px-3 bg-red-50/50 border-b border-gray-100">
+                    <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider">{phase.name}</span>
+                  </div>
                   <WorkstreamLabel
-                    key={ws.id}
-                    workstream={ws}
-                    isExpanded={expandedIds.has(ws.id)}
-                    onToggle={() => toggleExpand(ws.id)}
-                    onStatusClick={(e) => handleStatusClick(ws, e)}
+                    workstream={phase}
+                    isExpanded={expandedIds.has(phase.id)}
+                    onToggle={() => toggleExpand(phase.id)}
+                    onStatusClick={(e) => handleStatusClick(phase, e)}
                   />
-                ))}
-              </>
-            )}
+                  {/* Child scopes under this phase */}
+                  {childScopes.map(ws => (
+                    <WorkstreamLabel
+                      key={ws.id}
+                      workstream={ws}
+                      isExpanded={expandedIds.has(ws.id)}
+                      onToggle={() => toggleExpand(ws.id)}
+                      onStatusClick={(e) => handleStatusClick(ws, e)}
+                      isChild
+                    />
+                  ))}
+                </div>
+              )
+            })}
 
-            {scopes.length > 0 && (
+            {/* Unassigned scopes (no parent phase) */}
+            {(scopesByPhase.get('_unassigned') || []).length > 0 && (
               <>
                 <div className="h-8 flex items-center px-3 bg-blue-50/50 border-b border-gray-100">
-                  <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Scopes of Work</span>
+                  <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Other Scopes</span>
                 </div>
-                {scopes.map(ws => (
+                {(scopesByPhase.get('_unassigned') || []).map(ws => (
                   <WorkstreamLabel
                     key={ws.id}
                     workstream={ws}
@@ -262,33 +298,48 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
                   height={getContentHeight()}
                 />
 
-                {/* Phase rows */}
-                {phases.length > 0 && (
-                  <>
-                    <div className="h-8" />
-                    {phases.map((ws, idx) => (
+                {/* Phase rows with child scopes */}
+                {phases.map(phase => {
+                  const childScopes = scopesByPhase.get(phase.id) || []
+                  return (
+                    <div key={phase.id}>
+                      <div className="h-8" />
                       <WorkstreamRow
-                        key={ws.id}
-                        workstream={ws}
+                        workstream={phase}
                         range={range}
                         dayWidth={DAY_WIDTH}
-                        isFirst={idx === 0}
-                        isExpanded={expandedIds.has(ws.id)}
-                        onToggle={() => toggleExpand(ws.id)}
+                        isFirst
+                        isExpanded={expandedIds.has(phase.id)}
+                        onToggle={() => toggleExpand(phase.id)}
                         onTaskToggle={onTaskToggle}
                         onFrdLoaded={onFrdLoaded}
-                        isDragging={activeDragId === ws.id}
-                        dragDeltaX={activeDragId === ws.id ? dragDeltaX : 0}
+                        isDragging={activeDragId === phase.id}
+                        dragDeltaX={activeDragId === phase.id ? dragDeltaX : 0}
                       />
-                    ))}
-                  </>
-                )}
+                      {childScopes.map((ws, idx) => (
+                        <WorkstreamRow
+                          key={ws.id}
+                          workstream={ws}
+                          range={range}
+                          dayWidth={DAY_WIDTH}
+                          isFirst={idx === 0}
+                          isExpanded={expandedIds.has(ws.id)}
+                          onToggle={() => toggleExpand(ws.id)}
+                          onTaskToggle={onTaskToggle}
+                          onFrdLoaded={onFrdLoaded}
+                          isDragging={activeDragId === ws.id}
+                          dragDeltaX={activeDragId === ws.id ? dragDeltaX : 0}
+                        />
+                      ))}
+                    </div>
+                  )
+                })}
 
-                {/* Scope rows */}
-                {scopes.length > 0 && (
+                {/* Unassigned scopes */}
+                {(scopesByPhase.get('_unassigned') || []).length > 0 && (
                   <>
                     <div className="h-8" />
-                    {scopes.map((ws, idx) => (
+                    {(scopesByPhase.get('_unassigned') || []).map((ws, idx) => (
                       <WorkstreamRow
                         key={ws.id}
                         workstream={ws}
@@ -328,11 +379,13 @@ function WorkstreamLabel({
   isExpanded,
   onToggle,
   onStatusClick,
+  isChild,
 }: {
   workstream: Workstream
   isExpanded: boolean
   onToggle: () => void
   onStatusClick: (e: React.MouseEvent) => void
+  isChild?: boolean
 }) {
   const statusColors: Record<string, string> = {
     not_started: 'bg-gray-200 text-gray-600',
@@ -344,10 +397,10 @@ function WorkstreamLabel({
   return (
     <>
       <div
-        className={`flex items-center gap-2 px-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
+        className={`flex items-center gap-2 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
           isExpanded ? 'bg-gray-50' : ''
-        }`}
-        style={{ height: ROW_HEIGHT }}
+        } ${isChild ? 'bg-blue-50/30' : ''}`}
+        style={{ height: ROW_HEIGHT, paddingLeft: isChild ? 24 : 12, paddingRight: 12 }}
         onClick={onToggle}
       >
         <svg
@@ -359,11 +412,11 @@ function WorkstreamLabel({
         </svg>
 
         <div
-          className="w-2.5 h-2.5 rounded-full shrink-0"
+          className={`shrink-0 rounded-full ${isChild ? 'w-2 h-2' : 'w-2.5 h-2.5'}`}
           style={{ backgroundColor: workstream.color || '#6b7280' }}
         />
 
-        <span className="text-xs font-medium text-gray-800 truncate flex-1">
+        <span className={`truncate flex-1 ${isChild ? 'text-[11px] font-medium text-gray-700' : 'text-xs font-medium text-gray-800'}`}>
           {workstream.name}
         </span>
 

@@ -7,6 +7,7 @@ interface WorkstreamRow {
   id: string
   name: string
   category: string
+  parent_id: string | null
   assignee_id: string | null
   start_date: string
   end_date: string
@@ -81,6 +82,7 @@ export async function GET() {
       id: ws.id,
       name: ws.name,
       category: ws.category,
+      parentId: ws.parent_id,
       assigneeId: ws.assignee_id,
       startDate: ws.start_date,
       endDate: ws.end_date,

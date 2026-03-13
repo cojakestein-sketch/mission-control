@@ -1507,6 +1507,158 @@ const migrations: Migration[] = [
       insertTask.run('t-ptr-3', 'post-trip-review', 'Tryps Review System — like/dislike/feedback for trips', 'todo', 2, now, now)
       insertTask.run('t-ptr-4', 'post-trip-review', 'Trip Cash / Miles Rewards — earn miles per trip (real distance from home airport), rewards for DNA quiz & data collection, funds X-402 API calls', 'todo', 3, now, now)
     }
+  },
+  {
+    id: '047_replace_scopes_with_p1_scopes',
+    up(db: Database.Database) {
+      const now = new Date().toISOString()
+
+      // 1. Add parent_id column to workstreams
+      const cols = db.prepare(`PRAGMA table_info(workstreams)`).all() as { name: string }[]
+      if (!cols.some(c => c.name === 'parent_id')) {
+        db.exec(`ALTER TABLE workstreams ADD COLUMN parent_id TEXT REFERENCES workstreams(id)`)
+      }
+
+      // 2. Delete ALL existing scope workstreams and their tasks
+      const existingScopes = db.prepare(`SELECT id FROM workstreams WHERE category = 'scope'`).all() as { id: string }[]
+      for (const scope of existingScopes) {
+        db.prepare(`DELETE FROM workstream_tasks WHERE workstream_id = ?`).run(scope.id)
+        db.prepare(`DELETE FROM workstream_meetings WHERE workstream_id = ?`).run(scope.id)
+        db.prepare(`DELETE FROM workstreams WHERE id = ?`).run(scope.id)
+      }
+
+      // 3. Update P1 end date to cover all scopes
+      db.prepare(`UPDATE workstreams SET end_date = '2026-04-05' WHERE id = 'p1-core'`).run()
+
+      // 4. Insert 6 new P1 scopes
+      const insertWs = db.prepare(`
+        INSERT OR IGNORE INTO workstreams (id, name, category, assignee_id, start_date, end_date, status, color, frd_path, progress, sort_order, parent_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      const scopes = [
+        { id: 'p1-core-flows',            name: '1. Core Flows (19 Flows)',         start: '2026-03-09', end: '2026-03-22', color: '#2563eb', status: 'in_progress', progress: 0.45, order: 10 },
+        { id: 'p1-tooltips-teaching',      name: '2. Tooltips & Teaching',           start: '2026-03-22', end: '2026-03-28', color: '#7c3aed', status: 'not_started', progress: 0,    order: 11 },
+        { id: 'p1-notifications-voting',   name: '3. Notifications & Voting',        start: '2026-03-22', end: '2026-03-30', color: '#059669', status: 'not_started', progress: 0,    order: 12 },
+        { id: 'p1-post-trip-review',       name: '4. Post-Trip Review',              start: '2026-03-25', end: '2026-04-02', color: '#d97706', status: 'not_started', progress: 0,    order: 13 },
+        { id: 'p1-travel-dna',            name: '5. Travel DNA',                    start: '2026-03-24', end: '2026-03-31', color: '#0891b2', status: 'not_started', progress: 0,    order: 14 },
+        { id: 'p1-recommendations',        name: '6. Recommendation Algorithm',      start: '2026-03-28', end: '2026-04-05', color: '#4f46e5', status: 'not_started', progress: 0,    order: 15 },
+      ]
+
+      for (const s of scopes) {
+        insertWs.run(
+          s.id, s.name, 'scope', null,
+          s.start, s.end, s.status, s.color,
+          `scopes/p1/${s.id.replace('p1-', '')}/frd.md`,
+          s.progress, s.order, 'p1-core', now, now
+        )
+      }
+
+      // 5. Insert sub-tasks for each scope
+      const insertTask = db.prepare(`
+        INSERT OR IGNORE INTO workstream_tasks (id, workstream_id, title, status, assignee_id, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      // --- Scope 1: Core Flows (19 flows from flow-tracker) ---
+      const coreFlows = [
+        { id: 't-cf-01', title: 'Flow 1: New User Onboarding (12 screens)',         status: 'done' },
+        { id: 't-cf-02', title: 'Flow 2: Invite → Join — New User (12 screens)',    status: 'done' },
+        { id: 't-cf-03', title: 'Flow 3: Invite → Join — Existing (9 screens)',     status: 'done' },
+        { id: 't-cf-04', title: 'Flow 4: Trip Creation / Trip Menu (21 screens)',   status: 'done' },
+        { id: 't-cf-05', title: 'Flow 5: Invite & Share (11 screens)',              status: 'done' },
+        { id: 't-cf-06', title: 'Flow 6: Itinerary Tab (~12 screens)',              status: 'done' },
+        { id: 't-cf-07', title: 'Flow 7: Activities Tab (~11 screens)',             status: 'done' },
+        { id: 't-cf-08', title: 'Flow 8: People Tab — Trip (14 screens)',           status: 'done' },
+        { id: 't-cf-09', title: 'Flow 9: Stay Tab (24 screens)',                    status: 'todo' },
+        { id: 't-cf-10', title: 'Flow 10: Vibe Tab (15 screens)',                   status: 'done' },
+        { id: 't-cf-11', title: 'Flow 11: Packing List Tab (9 screens)',            status: 'in_progress' },
+        { id: 't-cf-12', title: 'Flow 12: Expenses Tab (32 screens)',               status: 'in_progress' },
+        { id: 't-cf-13', title: 'Flow 13: Post-Trip State (6 screens)',             status: 'todo' },
+        { id: 't-cf-14', title: 'Flow 14: Travel DNA Standalone (6 screens)',       status: 'todo' },
+        { id: 't-cf-15', title: 'Flow 15: Calendar Tab — Reskin (10 screens)',      status: 'todo' },
+        { id: 't-cf-16', title: 'Flow 16: Explore Tab — Reskin (10 screens)',       status: 'todo' },
+        { id: 't-cf-17', title: 'Flow 17: People Tab Social — Reskin (11 screens)', status: 'todo' },
+        { id: 't-cf-18', title: 'Flow 18: Profile & Settings — Reskin (11 screens)',status: 'todo' },
+        { id: 't-cf-19', title: 'Flow 19: Home & Discover (10 screens)',            status: 'todo' },
+      ]
+      coreFlows.forEach((t, i) => {
+        insertTask.run(t.id, 'p1-core-flows', t.title, t.status, null, i, now, now)
+      })
+
+      // --- Scope 2: Tooltips & Teaching ---
+      const tooltipTasks = [
+        { id: 't-tt-01', title: 'Tooltip system framework & component library' },
+        { id: 't-tt-02', title: 'First-launch onboarding tooltip sequence' },
+        { id: 't-tt-03', title: 'Feature discovery tooltips (trip card sections)' },
+        { id: 't-tt-04', title: 'Contextual teaching moments (empty states → action)' },
+        { id: 't-tt-05', title: 'Progressive disclosure strategy (beginner → power user)' },
+      ]
+      tooltipTasks.forEach((t, i) => {
+        insertTask.run(t.id, 'p1-tooltips-teaching', t.title, 'todo', null, i, now, now)
+      })
+
+      // --- Scope 3: Notifications & Voting ---
+      const notifTasks = [
+        { id: 't-nv-01', title: 'Push notification system (Expo Notifications)' },
+        { id: 't-nv-02', title: '48-hour voting window rules & auto-close' },
+        { id: 't-nv-03', title: 'Vote management UI (create poll, cast vote, results)' },
+        { id: 't-nv-04', title: 'Notification preferences & quiet hours' },
+        { id: 't-nv-05', title: 'Activity-based notifications (new expense, itinerary change)' },
+        { id: 't-nv-06', title: 'Deadline reminders (trip departure, vote closing)' },
+      ]
+      notifTasks.forEach((t, i) => {
+        insertTask.run(t.id, 'p1-notifications-voting', t.title, 'todo', null, i, now, now)
+      })
+
+      // --- Scope 4: Post-Trip Review ---
+      const postTripTasks = [
+        { id: 't-pt-01', title: '60-second montage video (annual recap, auto-generated)' },
+        { id: 't-pt-02', title: 'Top 3 activities selection (group votes post-trip)' },
+        { id: 't-pt-03', title: 'Post-trip sentiment review & trip rating' },
+        { id: 't-pt-04', title: 'Yearly "on this day" memories (push notification)' },
+        { id: 't-pt-05', title: 'Post-trip photo gallery & highlights reel' },
+      ]
+      postTripTasks.forEach((t, i) => {
+        insertTask.run(t.id, 'p1-post-trip-review', t.title, 'todo', null, i, now, now)
+      })
+
+      // --- Scope 5: Travel DNA ---
+      const travelDnaTasks = [
+        { id: 't-td-01', title: 'Travel DNA scoring algorithm design & implementation' },
+        { id: 't-td-02', title: 'NL enhancements — natural language quiz instead of multiple choice' },
+        { id: 't-td-03', title: 'Influence strategy — prompts & nudges to fill out DNA section' },
+        { id: 't-td-04', title: 'DNA profile display & sharing card' },
+        { id: 't-td-05', title: 'Group DNA compatibility score (trip-level)' },
+      ]
+      travelDnaTasks.forEach((t, i) => {
+        insertTask.run(t.id, 'p1-travel-dna', t.title, 'todo', null, i, now, now)
+      })
+
+      // --- Scope 6: Recommendation Algorithm ---
+      const recoTasks = [
+        { id: 't-rc-01', title: 'Sub-scope A: Activity recommendations (based on DNA + location)' },
+        { id: 't-rc-02', title: 'Sub-scope B: Trip recommendations (based on group DNA overlap)' },
+        { id: 't-rc-03', title: 'Sub-scope C: Flight recommendations (arrival time + trip days)' },
+        { id: 't-rc-04', title: 'Sub-scope D: Accommodation recommendations (stay preferences)' },
+        { id: 't-rc-05', title: 'Sub-scope E: Discovery engine — "other places to recommend"' },
+        { id: 't-rc-06', title: 'Recommendation algorithm core (scoring, ranking, personalization)' },
+      ]
+      recoTasks.forEach((t, i) => {
+        insertTask.run(t.id, 'p1-recommendations', t.title, 'todo', null, i, now, now)
+      })
+
+      // Recalculate progress for new scopes
+      for (const s of scopes) {
+        const row = db.prepare(`
+          SELECT COUNT(*) as total, SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done
+          FROM workstream_tasks WHERE workstream_id = ?
+        `).get(s.id) as { total: number; done: number }
+        if (row.total > 0) {
+          db.prepare('UPDATE workstreams SET progress = ?, updated_at = ? WHERE id = ?').run(row.done / row.total, now, s.id)
+        }
+      }
+    }
   }
 ]
 

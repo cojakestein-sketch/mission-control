@@ -2,6 +2,7 @@ export interface Workstream {
   id: string
   name: string
   category: 'phase' | 'scope'
+  parentId: string | null
   assigneeId: string | null
   startDate: string // ISO 8601
   endDate: string

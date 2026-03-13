@@ -1809,6 +1809,121 @@ const migrations: Migration[] = [
       ]
       logisticsTasks.forEach((t, i) => insertTask.run(t.id, 'p3-logistics-agent', t.title, 'todo', i, now, now))
     }
+  },
+  {
+    id: '049_p4_p5_phases_and_scopes',
+    up(db: Database.Database) {
+      const now = new Date().toISOString()
+
+      // 1. Insert P4 and P5 phase workstreams
+      const insertWs = db.prepare(`
+        INSERT OR IGNORE INTO workstreams (id, name, category, assignee_id, start_date, end_date, status, color, frd_path, spec_path, progress, sort_order, parent_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      // P4 phase
+      insertWs.run('p4-brand-gtm', 'P4: Brand & Go-to-Market', 'phase', null, '2026-04-22', '2026-05-10', 'not_started', '#f59e0b', null, null, 0, 4, null, now, now)
+      // P5 phase
+      insertWs.run('p5-v2-beta', 'P5: V2 Beta', 'phase', null, '2026-05-10', '2026-05-30', 'not_started', '#0d9488', null, null, 0, 5, null, now, now)
+
+      // 2. Insert P4 scopes (4 scopes)
+      const p4Scopes = [
+        { id: 'p4-socials-presence',      name: '1. Socials & Presence',               start: '2026-04-22', end: '2026-05-03', color: '#f59e0b', status: 'not_started', order: 40 },
+        { id: 'p4-wispr-playbook',        name: '2. Wispr Flow Playbook (UGC)',        start: '2026-04-25', end: '2026-05-06', color: '#d97706', status: 'not_started', order: 41 },
+        { id: 'p4-referral-incentives',   name: '3. Referral Incentives (999/369)',    start: '2026-04-28', end: '2026-05-08', color: '#ea580c', status: 'not_started', order: 42 },
+        { id: 'p4-giveaways',            name: '4. Giveaways (Dream Trip)',           start: '2026-05-01', end: '2026-05-10', color: '#c2410c', status: 'not_started', order: 43 },
+      ]
+
+      for (const s of p4Scopes) {
+        const frdPath = `scopes/p4/${s.id.replace('p4-', '')}/frd.md`
+        const specPath = `scopes/p4/${s.id.replace('p4-', '')}/spec.md`
+        insertWs.run(s.id, s.name, 'scope', null, s.start, s.end, s.status, s.color, frdPath, specPath, 0, s.order, 'p4-brand-gtm', now, now)
+      }
+
+      // 3. Insert P5 scopes (2 scopes)
+      const p5Scopes = [
+        { id: 'p5-friends-family',        name: '1. Family & Friends Testing',         start: '2026-05-10', end: '2026-05-22', color: '#0d9488', status: 'not_started', order: 50 },
+        { id: 'p5-strangers-review',      name: '2. MIT + Stranger Reviews',           start: '2026-05-15', end: '2026-05-30', color: '#0f766e', status: 'not_started', order: 51 },
+      ]
+
+      for (const s of p5Scopes) {
+        const frdPath = `scopes/p5/${s.id.replace('p5-', '')}/frd.md`
+        const specPath = `scopes/p5/${s.id.replace('p5-', '')}/spec.md`
+        insertWs.run(s.id, s.name, 'scope', null, s.start, s.end, s.status, s.color, frdPath, specPath, 0, s.order, 'p5-v2-beta', now, now)
+      }
+
+      // 4. Insert sub-tasks
+      const insertTask = db.prepare(`
+        INSERT OR IGNORE INTO workstream_tasks (id, workstream_id, title, status, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      // --- P4 Scope 1: Socials & Presence ---
+      const socialsTasks = [
+        { id: 't-sp4-01', title: 'Social media strategy & channel selection (IG, TikTok, Twitter)' },
+        { id: 't-sp4-02', title: 'Brand voice & content calendar framework' },
+        { id: 't-sp4-03', title: 'Influencer partnership outreach & deal structure' },
+        { id: 't-sp4-04', title: 'Public trip discovery layer (social sharing)' },
+        { id: 't-sp4-05', title: 'Content templates & asset library (Canva/Figma)' },
+      ]
+      socialsTasks.forEach((t, i) => insertTask.run(t.id, 'p4-socials-presence', t.title, 'todo', i, now, now))
+
+      // --- P4 Scope 2: Wispr Flow Playbook (UGC) ---
+      const wisprTasks = [
+        { id: 't-wp-01', title: 'Creator recruitment pipeline (identify & reach 50 candidates)' },
+        { id: 't-wp-02', title: 'Compensation model design ($6.2K/week benchmark from Wispr)' },
+        { id: 't-wp-03', title: 'Content hook library (viral hooks adapted for travel)' },
+        { id: 't-wp-04', title: 'UGC replication system adapted for Tryps' },
+        { id: 't-wp-05', title: 'Creator onboarding workflow & brief templates' },
+        { id: 't-wp-06', title: 'Performance tracking dashboard (views, conversions, CAC)' },
+      ]
+      wisprTasks.forEach((t, i) => insertTask.run(t.id, 'p4-wispr-playbook', t.title, 'todo', i, now, now))
+
+      // --- P4 Scope 3: Referral Incentives (999/369) ---
+      const referralTasks = [
+        { id: 't-ri-01', title: 'Trip Fund referral program ($5 per side, "refer 9 → $99" framing)' },
+        { id: 't-ri-02', title: 'Tryps 100 invite-only launch club mechanics' },
+        { id: 't-ri-03', title: 'Trip Unlock people-wall (features at 3/6/9 people)' },
+        { id: 't-ri-04', title: 'Feature gatekeeping mechanics (unlock via invites or milestones)' },
+        { id: 't-ri-05', title: '999/369 tier structure & reward ladder' },
+        { id: 't-ri-06', title: 'First Mover Credit organizer incentives ($10 per qualifying trip)' },
+        { id: 't-ri-07', title: 'Referral tracking & attribution system' },
+      ]
+      referralTasks.forEach((t, i) => insertTask.run(t.id, 'p4-referral-incentives', t.title, 'todo', i, now, now))
+
+      // --- P4 Scope 4: Giveaways (Dream Trip) ---
+      const giveawayTasks = [
+        { id: 't-gw-01', title: 'Cabo trip giveaway (4-6 tickets + 2 nights Airbnb)' },
+        { id: 't-gw-02', title: 'Paris trip giveaway (4-6 tickets + accommodation)' },
+        { id: 't-gw-03', title: 'Napa trip giveaway (weekend wine country)' },
+        { id: 't-gw-04', title: 'Dream trip contest mechanics (entry, selection, fulfillment)' },
+        { id: 't-gw-05', title: 'Cost model & budget per giveaway (~$1.6K/trip, 3 rounds)' },
+        { id: 't-gw-06', title: 'Partner/sponsor integration (co-branded giveaways)' },
+      ]
+      giveawayTasks.forEach((t, i) => insertTask.run(t.id, 'p4-giveaways', t.title, 'todo', i, now, now))
+
+      // --- P5 Scope 1: Family & Friends Testing ---
+      const ffTasks = [
+        { id: 't-ff-01', title: 'Feedback prompt workflow (talk-to-prompt system for collecting reactions)' },
+        { id: 't-ff-02', title: 'Structured testing scripts per feature area' },
+        { id: 't-ff-03', title: 'TestFlight distribution to inner circle (curated list)' },
+        { id: 't-ff-04', title: 'Feedback collection & triage pipeline (Supabase → ClickUp)' },
+        { id: 't-ff-05', title: 'Testing-specific onboarding flow (guided first experience)' },
+        { id: 't-ff-06', title: 'Session recording & interaction heatmaps' },
+      ]
+      ffTasks.forEach((t, i) => insertTask.run(t.id, 'p5-friends-family', t.title, 'todo', i, now, now))
+
+      // --- P5 Scope 2: MIT + Stranger Reviews ---
+      const strangerTasks = [
+        { id: 't-sr-01', title: 'MIT Product People outreach (structured cold emails)' },
+        { id: 't-sr-02', title: 'Reddit seeding (r/travel, r/grouptravel, r/solotravel)' },
+        { id: 't-sr-03', title: 'Travel forum posts (Lonely Planet, TripAdvisor community)' },
+        { id: 't-sr-04', title: 'Cold outreach to travel bloggers & micro-influencers' },
+        { id: 't-sr-05', title: 'Stranger feedback collection (different prompt than friends)' },
+        { id: 't-sr-06', title: 'Campus ambassador pilot (college group trip targeting)' },
+      ]
+      strangerTasks.forEach((t, i) => insertTask.run(t.id, 'p5-strangers-review', t.title, 'todo', i, now, now))
+    }
   }
 ]
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import type { Workstream, WorkstreamTask } from './types'
+import type { Workstream, ScopePipelineStep, PipelineStepKey } from './types'
 
 interface AccordionDetailProps {
   workstream: Workstream
@@ -9,22 +9,101 @@ interface AccordionDetailProps {
   onFrdLoaded?: (workstreamId: string, content: string) => void
 }
 
-export function AccordionDetail({ workstream, onTaskToggle, onFrdLoaded }: AccordionDetailProps) {
-  const doneTasks = workstream.subTasks.filter(t => t.status === 'done').length
-  const totalTasks = workstream.subTasks.length
-  const progressPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
+// Pipeline step definitions
+const PIPELINE_STEPS: {
+  key: PipelineStepKey
+  label: string
+  number: string
+  color: string
+  conditional?: boolean
+}[] = [
+  { key: 'spec', label: 'SPEC', number: '1', color: '#7c3aed' },
+  { key: 'frd', label: 'FRD', number: '2', color: '#2563eb' },
+  { key: 'design_screens', label: 'DESIGN SCREENS', number: '2a', color: '#db2777', conditional: true },
+  { key: 'plan', label: 'PLAN', number: '3', color: '#d97706' },
+  { key: 'work', label: 'WORK', number: '4', color: '#d97706' },
+  { key: 'review', label: 'REVIEW', number: '5', color: '#d97706' },
+  { key: 'compound', label: 'COMPOUND LEARNINGS', number: '6', color: '#d97706' },
+  { key: 'merge_pr', label: 'MERGE PR', number: '7', color: '#16a34a' },
+  { key: 'dev_feedback', label: 'DEV FEEDBACK', number: '8', color: '#dc2626' },
+  { key: 'post_dev_fixes', label: 'FIXES & LEARNINGS', number: '9', color: '#d97706' },
+  { key: 'merge_status', label: 'MERGED?', number: '10', color: '#16a34a' },
+]
 
-  const [activeDocTab, setActiveDocTab] = useState<'spec' | 'frd'>('spec')
+const COMPLETED_STATUSES = new Set([
+  'ready', 'complete', 'pass', 'submitted', 'approved', 'closed',
+  'dev-ready', 'pr_merged',
+])
+
+function getStatusBadgeClass(status: string): string {
+  if (!status || status === 'empty' || status === 'not_started') {
+    return 'border border-gray-300 text-gray-400 bg-transparent'
+  }
+  if (['draft', 'awaiting', 'awaiting_approval'].includes(status)) {
+    return 'bg-yellow-100 text-yellow-700'
+  }
+  if (COMPLETED_STATUSES.has(status)) {
+    return 'bg-green-100 text-green-700'
+  }
+  if (status === 'fail') {
+    return 'bg-red-100 text-red-700'
+  }
+  if (['pr_open', 'built', 'needs-figma'].includes(status)) {
+    return 'bg-blue-100 text-blue-700'
+  }
+  return 'border border-gray-300 text-gray-400 bg-transparent'
+}
+
+function formatStatus(status: string): string {
+  return status.replace(/_/g, ' ').replace(/-/g, ' ')
+}
+
+export function AccordionDetail({ workstream, onFrdLoaded }: AccordionDetailProps) {
+  const pipeline = workstream.pipeline
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
   const [frdLoading, setFrdLoading] = useState(false)
   const [frdFetched, setFrdFetched] = useState(false)
-  const [frdError, setFrdError] = useState<string | null>(null)
 
-  // Fetch FRD on mount if path exists but content is empty (once per mount)
+  // Determine which steps to show
+  const visibleSteps = PIPELINE_STEPS.filter(step => {
+    if (!step.conditional) return true
+    if (step.key === 'design_screens') {
+      const ds = pipeline.design_screens
+      if (!ds) return false
+      if (ds.status === 'not_started') {
+        const meta = ds.meta as Record<string, unknown> | null
+        const screens = meta?.designScreens as string[] | undefined
+        return screens && screens.length > 0
+      }
+      return true
+    }
+    return true
+  })
+
+  // Count completed
+  const completedCount = visibleSteps.filter(step => {
+    const s = pipeline[step.key]
+    return s && COMPLETED_STATUSES.has(s.status)
+  }).length
+
+  const toggleStep = useCallback((key: string) => {
+    setExpandedSteps(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+
+  // FRD lazy-fetch on expand
   useEffect(() => {
-    if (workstream.frdPath && !workstream.frdContent && !frdLoading && !frdFetched) {
+    if (!expandedSteps.has('frd')) return
+    const frdStep = pipeline.frd
+    const frdMeta = frdStep?.meta as Record<string, unknown> | null
+    const frdPath = frdMeta?.frdPath as string | undefined
+    if (frdPath && !frdStep?.content && !frdLoading && !frdFetched) {
       setFrdLoading(true)
       setFrdFetched(true)
-      setFrdError(null)
       fetch(`/api/frd/${workstream.id}`)
         .then(res => res.json())
         .then(data => {
@@ -32,213 +111,412 @@ export function AccordionDetail({ workstream, onTaskToggle, onFrdLoaded }: Accor
             onFrdLoaded?.(workstream.id, data.frdContent)
           }
         })
-        .catch(err => setFrdError(String(err)))
+        .catch(() => {})
         .finally(() => setFrdLoading(false))
     }
-  }, [workstream.id, workstream.frdPath, workstream.frdContent, frdLoading, frdFetched, onFrdLoaded])
-
-  // GitHub URLs
-  const docRepo = 'cojakestein-sketch/tryps-docs'
-  const frdFileName = workstream.frdPath || `docs/frds/${workstream.id}.md`
-  const specFileName = workstream.specPath || `docs/specs/${workstream.id}.md`
-  const frdTemplate = encodeURIComponent(
-    `# ${workstream.name} — Functional Requirements\n\n## Overview\n[What is this workstream about?]\n\n## Requirements\n- [ ] Requirement 1\n- [ ] Requirement 2\n\n## Design\n[Links to Figma, mockups, etc.]\n\n## Notes\n[Any additional context]\n`
-  )
-  const specTemplate = encodeURIComponent(
-    `# ${workstream.name} — Spec\n\n## Intent\n[Why does this scope exist?]\n\n## Acceptance Criteria\n- [ ] Criterion 1\n- [ ] Criterion 2\n`
-  )
-  const createFrdUrl = `https://github.com/${docRepo}/new/main?filename=${frdFileName}&value=${frdTemplate}`
-  const createSpecUrl = `https://github.com/${docRepo}/new/main?filename=${specFileName}&value=${specTemplate}`
+  }, [expandedSteps, pipeline.frd, workstream.id, frdLoading, frdFetched, onFrdLoaded])
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg mx-2 mb-2 overflow-hidden shadow-sm">
-      <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
-        {/* Sub-tasks */}
-        <div className="p-3">
-          <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Sub-tasks ({doneTasks}/{totalTasks})
-          </h4>
-          {workstream.subTasks.length === 0 ? (
-            <p className="text-xs text-gray-400 italic">No sub-tasks yet</p>
-          ) : (
-            <div className="space-y-1.5 max-h-40 overflow-y-auto">
-              {workstream.subTasks.map(task => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  onToggle={onTaskToggle}
-                />
-              ))}
-            </div>
-          )}
+      {/* Pipeline header */}
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-100">
+        <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          Pipeline
+        </span>
+        <span className="text-[11px] font-medium text-gray-600">
+          {completedCount}/{visibleSteps.length} complete
+        </span>
+        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-green-500 rounded-full transition-all duration-300"
+            style={{ width: `${visibleSteps.length > 0 ? (completedCount / visibleSteps.length) * 100 : 0}%` }}
+          />
         </div>
+      </div>
 
-        {/* Documents: Spec + FRD tabs */}
-        <div className="p-3">
-          <div className="flex items-center gap-1 mb-2">
-            <button
-              onClick={() => setActiveDocTab('spec')}
-              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
-                activeDocTab === 'spec'
-                  ? 'bg-purple-100 text-purple-700'
-                  : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              SPEC
-            </button>
-            <button
-              onClick={() => setActiveDocTab('frd')}
-              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
-                activeDocTab === 'frd'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              FRD
-            </button>
-            {/* View on GitHub link */}
-            {activeDocTab === 'frd' && workstream.frdContent && workstream.frdPath && (
-              <a href={`https://github.com/${docRepo}/blob/main/${frdFileName}`} target="_blank" rel="noopener noreferrer" className="ml-auto text-[9px] text-blue-500 hover:underline">View on GitHub</a>
-            )}
-            {activeDocTab === 'spec' && workstream.specPath && (
-              <a href={`https://github.com/${docRepo}/blob/main/${specFileName}`} target="_blank" rel="noopener noreferrer" className="ml-auto text-[9px] text-purple-500 hover:underline">View on GitHub</a>
-            )}
-          </div>
+      {/* Step list */}
+      <div className="relative">
+        {visibleSteps.map((step, idx) => {
+          const pipelineStep = pipeline[step.key]
+          const status = pipelineStep?.status || 'not_started'
+          const isExpanded = expandedSteps.has(step.key)
+          const isCompleted = COMPLETED_STATUSES.has(status)
+          const isLast = idx === visibleSteps.length - 1
 
-          {activeDocTab === 'spec' ? (
-            // Spec tab
-            workstream.specContent ? (
-              <div className="text-xs text-gray-700 max-h-40 overflow-y-auto prose prose-xs">
-                <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(workstream.specContent) }} />
-              </div>
-            ) : workstream.specPath ? (
-              <div className="text-center py-3">
-                <p className="text-xs text-gray-400 mb-2">Spec not created yet</p>
-                <a href={createSpecUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-full transition-colors">
-                  <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z" /></svg>
-                  Create Spec
-                </a>
-              </div>
-            ) : (
-              <p className="text-xs text-gray-400 italic">No spec linked</p>
-            )
-          ) : (
-            // FRD tab
-            frdLoading ? (
-              <div className="flex items-center gap-2 text-xs text-gray-400">
-                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Fetching FRD...
-              </div>
-            ) : frdError ? (
-              <p className="text-xs text-red-400 italic">Failed to load FRD</p>
-            ) : workstream.frdContent ? (
-              <div className="text-xs text-gray-700 max-h-40 overflow-y-auto prose prose-xs">
-                <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(workstream.frdContent) }} />
-              </div>
-            ) : workstream.frdPath ? (
-              <div className="text-center py-3">
-                <p className="text-xs text-gray-400 mb-2">FRD not created yet</p>
-                <a href={createFrdUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-full transition-colors">
-                  <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z" /></svg>
-                  Create FRD
-                </a>
-              </div>
-            ) : (
-              <p className="text-xs text-gray-400 italic">No FRD linked</p>
-            )
-          )}
-        </div>
-
-        {/* Meetings + Progress */}
-        <div className="p-3">
-          <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Meetings
-          </h4>
-          {workstream.meetings.length === 0 ? (
-            <p className="text-xs text-gray-400 italic">No meetings linked</p>
-          ) : (
-            <div className="space-y-1.5 max-h-28 overflow-y-auto">
-              {workstream.meetings.map(m => (
-                <div key={m.id} className="flex items-start gap-1.5 text-xs">
-                  <span className="text-gray-400 shrink-0">
-                    {new Date(m.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </span>
-                  <span className="text-gray-700 truncate">{m.title}</span>
-                  {m.meetLink && (
-                    <a
-                      href={m.meetLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 hover:underline shrink-0"
-                    >
-                      Join
-                    </a>
+          return (
+            <div key={step.key} className="relative">
+              {/* Step row */}
+              <button
+                onClick={() => toggleStep(step.key)}
+                className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-left"
+              >
+                {/* Circle + connector line */}
+                <div className="relative flex flex-col items-center shrink-0" style={{ width: 24 }}>
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
+                    style={{ backgroundColor: isCompleted ? step.color : '#d1d5db' }}
+                  >
+                    {isCompleted ? (
+                      <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z" />
+                      </svg>
+                    ) : step.number}
+                  </div>
+                  {!isLast && (
+                    <div
+                      className="absolute top-6 w-0.5"
+                      style={{
+                        height: isExpanded ? 'calc(100% + 8px)' : 16,
+                        backgroundColor: isCompleted ? step.color : '#e5e7eb',
+                      }}
+                    />
                   )}
                 </div>
-              ))}
-            </div>
-          )}
 
-          {/* Progress bar */}
-          <div className="mt-3 pt-2 border-t border-gray-100">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] text-gray-500 font-medium">Progress</span>
-              <span className="text-[10px] text-gray-700 font-semibold">{progressPct}%</span>
+                {/* Title */}
+                <span className="text-[11px] font-semibold text-gray-700 tracking-wide flex-1">
+                  {step.label}
+                </span>
+
+                {/* Status badge */}
+                <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase ${getStatusBadgeClass(status)}`}>
+                  {formatStatus(status)}
+                </span>
+
+                {/* Chevron */}
+                <svg
+                  className={`w-3 h-3 text-gray-400 transition-transform duration-150 shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
+                  viewBox="0 0 16 16"
+                  fill="currentColor"
+                >
+                  <path d="M6 3l5 5-5 5V3z" />
+                </svg>
+              </button>
+
+              {/* Expanded content */}
+              {isExpanded && (
+                <div className="pl-14 pr-4 pb-3">
+                  <StepContent
+                    stepKey={step.key}
+                    step={pipelineStep}
+                    workstream={workstream}
+                    frdLoading={frdLoading}
+                  />
+                </div>
+              )}
             </div>
-            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-300"
-                style={{
-                  width: `${progressPct}%`,
-                  backgroundColor: workstream.color || '#6b7280',
-                }}
-              />
-            </div>
-          </div>
-        </div>
+          )
+        })}
       </div>
     </div>
   )
 }
 
-function TaskRow({ task, onToggle }: { task: WorkstreamTask; onToggle: (id: string, status: 'todo' | 'done') => void }) {
-  const [optimistic, setOptimistic] = useState(task.status)
-  const isDone = optimistic === 'done'
+// Step-specific content rendering
+function StepContent({
+  stepKey,
+  step,
+  workstream,
+  frdLoading,
+}: {
+  stepKey: PipelineStepKey
+  step: ScopePipelineStep | null
+  workstream: Workstream
+  frdLoading: boolean
+}) {
+  const meta = step?.meta as Record<string, unknown> | null
+  const docRepo = 'cojakestein-sketch/tryps-docs'
 
-  const handleToggle = useCallback(() => {
-    const newStatus = isDone ? 'todo' : 'done'
-    setOptimistic(newStatus)
-    onToggle(task.id, newStatus)
-  }, [isDone, task.id, onToggle])
+  switch (stepKey) {
+    case 'spec': {
+      const specPath = (meta?.specPath as string) || workstream.specPath
+      const specContent = step?.content || workstream.specContent
+      const specFileName = specPath || `docs/specs/${workstream.id}.md`
+      const specTemplate = encodeURIComponent(
+        `# ${workstream.name} — Spec\n\n## Intent\n[Why does this scope exist?]\n\n## Acceptance Criteria\n- [ ] Criterion 1\n- [ ] Criterion 2\n`
+      )
+      const createSpecUrl = `https://github.com/${docRepo}/new/main?filename=${specFileName}&value=${specTemplate}`
 
+      if (specContent) {
+        return (
+          <div>
+            {specPath && (
+              <a href={`https://github.com/${docRepo}/blob/main/${specFileName}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-purple-500 hover:underline mb-2 inline-block">
+                View on GitHub
+              </a>
+            )}
+            <div className="text-xs text-gray-700 max-h-48 overflow-y-auto prose prose-xs">
+              <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(specContent) }} />
+            </div>
+          </div>
+        )
+      }
+      return (
+        <div className="text-center py-3">
+          <p className="text-xs text-gray-400 mb-2">Spec not created yet</p>
+          <a href={createSpecUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-full transition-colors">
+            <PlusIcon />
+            Create Spec
+          </a>
+        </div>
+      )
+    }
+
+    case 'frd': {
+      const frdPath = (meta?.frdPath as string) || workstream.frdPath
+      const frdContent = step?.content || workstream.frdContent
+      const frdFileName = frdPath || `docs/frds/${workstream.id}.md`
+      const frdTemplate = encodeURIComponent(
+        `# ${workstream.name} — Functional Requirements\n\n## Overview\n[What is this workstream about?]\n\n## Requirements\n- [ ] Requirement 1\n- [ ] Requirement 2\n\n## Design\n[Links to Figma, mockups, etc.]\n\n## Notes\n[Any additional context]\n`
+      )
+      const createFrdUrl = `https://github.com/${docRepo}/new/main?filename=${frdFileName}&value=${frdTemplate}`
+
+      if (frdLoading) {
+        return (
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Fetching FRD...
+          </div>
+        )
+      }
+
+      if (frdContent) {
+        return (
+          <div>
+            {frdPath && (
+              <a href={`https://github.com/${docRepo}/blob/main/${frdFileName}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:underline mb-2 inline-block">
+                View on GitHub
+              </a>
+            )}
+            <div className="text-xs text-gray-700 max-h-48 overflow-y-auto prose prose-xs">
+              <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(frdContent) }} />
+            </div>
+          </div>
+        )
+      }
+
+      return (
+        <div className="text-center py-3">
+          <p className="text-xs text-gray-400 mb-2">FRD not created yet</p>
+          <a href={createFrdUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-full transition-colors">
+            <PlusIcon />
+            Create FRD
+          </a>
+        </div>
+      )
+    }
+
+    case 'design_screens': {
+      const status = step?.status || 'not_started'
+      const screens = (meta?.designScreens as string[]) || []
+      const routing = meta?.routing as string | undefined
+
+      if (status === 'not_started') {
+        return (
+          <div className="text-center py-3">
+            <p className="text-xs text-gray-400">Run <code className="text-[10px] bg-gray-100 px-1 py-0.5 rounded">/pencil</code> to generate design screens</p>
+          </div>
+        )
+      }
+
+      return (
+        <div className="space-y-2">
+          {screens.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1">Screens</p>
+              <div className="flex flex-wrap gap-1">
+                {screens.map(s => (
+                  <span key={s} className="text-[10px] bg-pink-50 text-pink-700 px-2 py-0.5 rounded-full">{s}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {routing === 'dev-ready' && (
+            <p className="text-[10px] text-green-600 font-medium">Designs approved for dev reference</p>
+          )}
+          {routing === 'needs-figma' && (
+            <p className="text-[10px] text-yellow-600 font-medium">Routed to Figma designers</p>
+          )}
+        </div>
+      )
+    }
+
+    case 'merge_pr': {
+      const prUrl = meta?.prUrl as string | undefined
+      const prNumber = meta?.prNumber as number | undefined
+      const clickupTaskId = meta?.clickupTaskId as string | undefined
+      const assignedDevId = meta?.assignedDevId as string | undefined
+      const devBriefing = meta?.devBriefing as string | undefined
+
+      if (!step || step.status === 'not_started') {
+        return <EmptyState text="No PR created yet" />
+      }
+
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {prUrl && (
+              <a href={prUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-medium text-blue-600 hover:underline">
+                PR #{prNumber || 'link'}
+              </a>
+            )}
+            {clickupTaskId && (
+              <span className="text-[9px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">ClickUp: {clickupTaskId}</span>
+            )}
+            {assignedDevId && (
+              <span className="text-[9px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">@{assignedDevId}</span>
+            )}
+          </div>
+          {devBriefing && (
+            <div className="text-xs text-gray-700 max-h-32 overflow-y-auto">
+              <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(devBriefing) }} />
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    case 'dev_feedback': {
+      const assignedDevId = (pipeline_meta_from_merge(step, workstream) || 'dev')
+      if (!step || step.status === 'awaiting') {
+        return (
+          <div className="text-center py-3">
+            <p className="text-xs text-gray-400">Waiting for dev feedback from <span className="font-medium">{assignedDevId}</span>...</p>
+          </div>
+        )
+      }
+      if (step.content) {
+        return (
+          <div>
+            <p className="text-[10px] text-gray-500 mb-1">
+              By {(meta?.feedbackAuthor as string) || 'dev'} {meta?.submittedAt ? `on ${new Date(meta.submittedAt as string).toLocaleDateString()}` : ''}
+            </p>
+            <div className="text-xs text-gray-700 max-h-32 overflow-y-auto">
+              <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(step.content) }} />
+            </div>
+          </div>
+        )
+      }
+      return <EmptyState text="No feedback yet" />
+    }
+
+    case 'merge_status': {
+      if (!step || step.status === 'awaiting_approval') {
+        return (
+          <div className="text-center py-3">
+            <p className="text-xs text-gray-400">Awaiting approval</p>
+          </div>
+        )
+      }
+      if (step.status === 'approved' || step.status === 'closed') {
+        const approvedBy = meta?.approvedBy as string | undefined
+        const approvedAt = meta?.approvedAt as string | undefined
+        return (
+          <div className="flex items-center gap-2 py-2">
+            <svg className="w-4 h-4 text-green-500" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z" />
+            </svg>
+            <span className="text-xs text-green-700 font-medium">
+              {step.status === 'closed' ? 'Scope complete' : `Approved by ${approvedBy || 'team'}`}
+              {approvedAt && ` on ${new Date(approvedAt).toLocaleDateString()}`}
+            </span>
+          </div>
+        )
+      }
+      return <EmptyState text="Not started" />
+    }
+
+    case 'work': {
+      const filesChanged = (meta?.filesChanged as string[]) || []
+      return (
+        <div className="space-y-2">
+          {step?.content && (
+            <div className="text-xs text-gray-700 max-h-32 overflow-y-auto">
+              <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(step.content) }} />
+            </div>
+          )}
+          {filesChanged.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1">Files changed</p>
+              <div className="space-y-0.5">
+                {filesChanged.map(f => (
+                  <p key={f} className="text-[10px] text-gray-600 font-mono">{f}</p>
+                ))}
+              </div>
+            </div>
+          )}
+          {!step?.content && filesChanged.length === 0 && <EmptyState text="Not started" />}
+        </div>
+      )
+    }
+
+    case 'review': {
+      if (!step?.content) return <EmptyState text="Not started" />
+      const reviewResult = meta?.reviewResult as string | undefined
+      return (
+        <div>
+          {reviewResult && (
+            <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase mb-2 inline-block ${reviewResult === 'pass' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              {reviewResult}
+            </span>
+          )}
+          <div className="text-xs text-gray-700 max-h-32 overflow-y-auto">
+            <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(step.content) }} />
+          </div>
+        </div>
+      )
+    }
+
+    // Generic markdown content steps: plan, compound, post_dev_fixes
+    default: {
+      if (!step?.content) return <EmptyState text="Not started" />
+      return (
+        <div>
+          {step.generatedAt && (
+            <p className="text-[9px] text-gray-400 mb-1">Generated {new Date(step.generatedAt).toLocaleDateString()}</p>
+          )}
+          <div className="text-xs text-gray-700 max-h-32 overflow-y-auto">
+            <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(step.content) }} />
+          </div>
+        </div>
+      )
+    }
+  }
+}
+
+// Helper: get assigned dev from merge_pr step meta
+function pipeline_meta_from_merge(step: ScopePipelineStep | null, workstream: Workstream): string | null {
+  const mergePr = workstream.pipeline?.merge_pr
+  if (!mergePr?.meta) return null
+  const meta = mergePr.meta as Record<string, unknown>
+  return (meta.assignedDevId as string) || null
+}
+
+function EmptyState({ text }: { text: string }) {
   return (
-    <label className="flex items-center gap-2 cursor-pointer group">
-      <input
-        type="checkbox"
-        checked={isDone}
-        onChange={handleToggle}
-        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-1 focus:ring-blue-500"
-      />
-      <span className={`text-xs truncate ${isDone ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-        {task.title}
-      </span>
-      {task.assigneeId && (
-        <span className="text-[9px] text-gray-400 shrink-0">@{task.assigneeId}</span>
-      )}
-    </label>
+    <p className="text-xs text-gray-400 italic py-2">{text}</p>
   )
 }
 
-// Very simple markdown to HTML (headers, bold, lists)
+function PlusIcon() {
+  return (
+    <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z" />
+    </svg>
+  )
+}
+
+// Very simple markdown to HTML (headers, bold, lists, code)
 function simpleMarkdown(md: string): string {
   return md
     .replace(/^### (.+)$/gm, '<h3 class="font-semibold text-gray-800 mt-2">$1</h3>')
     .replace(/^## (.+)$/gm, '<h2 class="font-semibold text-gray-800 mt-2">$1</h2>')
     .replace(/^# (.+)$/gm, '<h1 class="font-bold text-gray-900 mt-2">$1</h1>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code class="text-[10px] bg-gray-100 px-1 py-0.5 rounded">$1</code>')
     .replace(/^- (.+)$/gm, '<li class="ml-3">$1</li>')
     .replace(/\n/g, '<br/>')
 }

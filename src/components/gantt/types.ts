@@ -1,3 +1,19 @@
+export type PipelineStepKey =
+  | 'spec' | 'frd' | 'design_screens' | 'plan' | 'work'
+  | 'review' | 'compound' | 'merge_pr' | 'dev_feedback'
+  | 'post_dev_fixes' | 'merge_status'
+
+export interface ScopePipelineStep {
+  id: string
+  workstreamId: string
+  stepKey: string
+  status: string
+  content: string | null
+  generatedAt: string | null
+  meta: Record<string, unknown> | null
+  updatedAt: string
+}
+
 export interface Workstream {
   id: string
   name: string
@@ -17,6 +33,7 @@ export interface Workstream {
   deepWorkCompleted: boolean
   subTasks: WorkstreamTask[]
   meetings: WorkstreamMeeting[]
+  pipeline: Record<PipelineStepKey, ScopePipelineStep | null>
 }
 
 export interface WorkstreamTask {

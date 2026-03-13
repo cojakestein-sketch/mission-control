@@ -122,15 +122,16 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
 
   const getContentHeight = () => {
     let h = 0
+    const EXPANDED_ESTIMATE = 300 // rough estimate for pipeline; actual height is auto
     for (const phase of phases) {
       h += 32 // phase group header
       h += ROW_HEIGHT // phase row
-      if (expandedIds.has(phase.id)) h += 180
+      if (expandedIds.has(phase.id)) h += EXPANDED_ESTIMATE
       const childScopes = scopesByPhase.get(phase.id) || []
       if (childScopes.length > 0) {
         for (const scope of childScopes) {
           h += ROW_HEIGHT
-          if (expandedIds.has(scope.id)) h += 180
+          if (expandedIds.has(scope.id)) h += EXPANDED_ESTIMATE
         }
       }
     }
@@ -140,7 +141,7 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
       h += 32
       for (const ws of unassigned) {
         h += ROW_HEIGHT
-        if (expandedIds.has(ws.id)) h += 180
+        if (expandedIds.has(ws.id)) h += EXPANDED_ESTIMATE
       }
     }
     return Math.max(h, 400)
@@ -448,7 +449,7 @@ function WorkstreamLabel({
       </div>
 
       {isExpanded && (
-        <div className="border-b border-gray-100" style={{ height: 180 }} />
+        <div className="border-b border-gray-100" />
       )}
     </>
   )
@@ -513,8 +514,8 @@ function WorkstreamRow({
       </div>
 
       {isExpanded && (
-        <div className="relative" style={{ height: 180 }}>
-          <div className="absolute inset-x-2 inset-y-0 overflow-visible">
+        <div className="relative">
+          <div className="px-2 pb-2">
             <AccordionDetail workstream={workstream} onTaskToggle={onTaskToggle} onFrdLoaded={onFrdLoaded} />
           </div>
         </div>

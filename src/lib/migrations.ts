@@ -1924,6 +1924,56 @@ const migrations: Migration[] = [
       ]
       strangerTasks.forEach((t, i) => insertTask.run(t.id, 'p5-strangers-review', t.title, 'todo', i, now, now))
     }
+  },
+  {
+    id: '050_scope_pipeline_steps',
+    up: (db) => {
+      // Create pipeline steps table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS scope_pipeline_steps (
+          id TEXT PRIMARY KEY,
+          workstream_id TEXT NOT NULL REFERENCES workstreams(id) ON DELETE CASCADE,
+          step_key TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'not_started',
+          content TEXT,
+          generated_at TEXT,
+          meta TEXT,
+          updated_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(workstream_id, step_key)
+        )
+      `)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_scope_pipeline_ws ON scope_pipeline_steps(workstream_id)`)
+
+      // Migrate existing spec data
+      db.exec(`
+        INSERT OR IGNORE INTO scope_pipeline_steps (id, workstream_id, step_key, status, content, meta)
+        SELECT
+          'sp-' || id || '-spec',
+          id,
+          'spec',
+          CASE WHEN spec_content IS NOT NULL AND spec_content != '' THEN 'ready' ELSE 'empty' END,
+          spec_content,
+          json_object('specPath', spec_path)
+        FROM workstreams
+        WHERE category = 'scope'
+      `)
+
+      // Migrate existing FRD data
+      db.exec(`
+        INSERT OR IGNORE INTO scope_pipeline_steps (id, workstream_id, step_key, status, content, meta)
+        SELECT
+          'sp-' || id || '-frd',
+          id,
+          'frd',
+          CASE WHEN frd_content IS NOT NULL AND frd_content != '' THEN 'ready'
+               WHEN frd_path IS NOT NULL AND frd_path != '' THEN 'draft'
+               ELSE 'empty' END,
+          frd_content,
+          json_object('frdPath', frd_path)
+        FROM workstreams
+        WHERE category = 'scope'
+      `)
+    }
   }
 ]
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getDatabase } from '@/lib/db'
+import type { PipelineStepKey, ScopePipelineStep } from '@/components/gantt/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,6 +48,73 @@ interface MeetingRow {
   gcal_event_id: string
 }
 
+interface PipelineStepRow {
+  id: string
+  workstream_id: string
+  step_key: string
+  status: string
+  content: string | null
+  generated_at: string | null
+  meta: string | null
+  updated_at: string
+}
+
+const ALL_STEP_KEYS: PipelineStepKey[] = [
+  'spec', 'frd', 'design_screens', 'plan', 'work',
+  'review', 'compound', 'merge_pr', 'dev_feedback',
+  'post_dev_fixes', 'merge_status',
+]
+
+function buildPipeline(
+  stepRows: Record<string, PipelineStepRow>,
+  ws: WorkstreamRow
+): Record<PipelineStepKey, ScopePipelineStep | null> {
+  const pipeline = {} as Record<PipelineStepKey, ScopePipelineStep | null>
+
+  for (const key of ALL_STEP_KEYS) {
+    const row = stepRows[key]
+    if (row) {
+      pipeline[key] = {
+        id: row.id,
+        workstreamId: row.workstream_id,
+        stepKey: row.step_key,
+        status: row.status,
+        content: row.content,
+        generatedAt: row.generated_at,
+        meta: row.meta ? JSON.parse(row.meta) : null,
+        updatedAt: row.updated_at,
+      }
+    } else if (key === 'spec') {
+      // Fallback to workstream columns
+      pipeline[key] = {
+        id: `fallback-${ws.id}-spec`,
+        workstreamId: ws.id,
+        stepKey: 'spec',
+        status: ws.spec_content ? 'ready' : 'empty',
+        content: ws.spec_content,
+        generatedAt: null,
+        meta: ws.spec_path ? { specPath: ws.spec_path } : null,
+        updatedAt: ws.updated_at,
+      }
+    } else if (key === 'frd') {
+      pipeline[key] = {
+        id: `fallback-${ws.id}-frd`,
+        workstreamId: ws.id,
+        stepKey: 'frd',
+        status: ws.frd_content ? 'ready' : ws.frd_path ? 'draft' : 'empty',
+        content: ws.frd_content,
+        generatedAt: null,
+        meta: ws.frd_path ? { frdPath: ws.frd_path } : null,
+        updatedAt: ws.updated_at,
+      }
+    } else {
+      pipeline[key] = null
+    }
+  }
+
+  return pipeline
+}
+
 export async function GET() {
   try {
     const db = getDatabase()
@@ -62,6 +130,19 @@ export async function GET() {
     const meetings = db.prepare(`
       SELECT * FROM workstream_meetings ORDER BY start_time ASC
     `).all() as MeetingRow[]
+
+    // Fetch pipeline steps
+    const pipelineSteps = db.prepare(`
+      SELECT * FROM scope_pipeline_steps ORDER BY workstream_id
+    `).all() as PipelineStepRow[]
+
+    // Group by workstream
+    const pipelineByWs = new Map<string, Record<string, PipelineStepRow>>()
+    for (const step of pipelineSteps) {
+      const map = pipelineByWs.get(step.workstream_id) || {}
+      map[step.step_key] = step
+      pipelineByWs.set(step.workstream_id, map)
+    }
 
     // Group tasks and meetings by workstream
     const tasksByWs = new Map<string, TaskRow[]>()
@@ -117,6 +198,7 @@ export async function GET() {
         meetLink: m.meet_link,
         gcalEventId: m.gcal_event_id,
       })),
+      pipeline: buildPipeline(pipelineByWs.get(ws.id) || {}, ws),
     }))
 
     return NextResponse.json({ workstreams: result })

@@ -218,9 +218,14 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
               const childScopes = scopesByPhase.get(phase.id) || []
               return (
                 <div key={phase.id}>
-                  {/* Phase header */}
-                  <div className="h-8 flex items-center px-3 bg-red-50/50 border-b border-gray-100">
+                  {/* Phase header with scope count */}
+                  <div className="h-8 flex items-center justify-between px-3 bg-red-50/50 border-b border-gray-100">
                     <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider">{phase.name}</span>
+                    {childScopes.length > 0 && (
+                      <span className="text-[9px] font-semibold text-red-400 bg-red-100 px-1.5 py-0.5 rounded-full">
+                        {childScopes.length} scope{childScopes.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
                   </div>
                   <WorkstreamLabel
                     workstream={phase}
@@ -229,16 +234,20 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
                     onStatusClick={(e) => handleStatusClick(phase, e)}
                   />
                   {/* Child scopes under this phase */}
-                  {childScopes.map(ws => (
-                    <WorkstreamLabel
-                      key={ws.id}
-                      workstream={ws}
-                      isExpanded={expandedIds.has(ws.id)}
-                      onToggle={() => toggleExpand(ws.id)}
-                      onStatusClick={(e) => handleStatusClick(ws, e)}
-                      isChild
-                    />
-                  ))}
+                  {childScopes.length > 0 && (
+                    <div className="border-l-2 border-red-200 ml-4">
+                      {childScopes.map(ws => (
+                        <WorkstreamLabel
+                          key={ws.id}
+                          workstream={ws}
+                          isExpanded={expandedIds.has(ws.id)}
+                          onToggle={() => toggleExpand(ws.id)}
+                          onStatusClick={(e) => handleStatusClick(ws, e)}
+                          isChild
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )
             })}

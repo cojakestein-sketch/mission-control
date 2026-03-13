@@ -16,6 +16,8 @@ interface WorkstreamRow {
   frd_path: string | null
   frd_content: string | null
   frd_synced_at: string | null
+  spec_path: string | null
+  spec_content: string | null
   progress: number
   sort_order: number
   deep_work_completed: number
@@ -90,6 +92,8 @@ export async function GET() {
       color: ws.color,
       frdPath: ws.frd_path,
       frdContent: ws.frd_content,
+      specPath: ws.spec_path,
+      specContent: ws.spec_content,
       progress: ws.progress,
       sortOrder: ws.sort_order,
       deepWorkCompleted: ws.deep_work_completed === 1,

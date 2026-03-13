@@ -14,6 +14,7 @@ export function AccordionDetail({ workstream, onTaskToggle, onFrdLoaded }: Accor
   const totalTasks = workstream.subTasks.length
   const progressPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
 
+  const [activeDocTab, setActiveDocTab] = useState<'spec' | 'frd'>('spec')
   const [frdLoading, setFrdLoading] = useState(false)
   const [frdFetched, setFrdFetched] = useState(false)
   const [frdError, setFrdError] = useState<string | null>(null)
@@ -36,13 +37,18 @@ export function AccordionDetail({ workstream, onTaskToggle, onFrdLoaded }: Accor
     }
   }, [workstream.id, workstream.frdPath, workstream.frdContent, frdLoading, frdFetched, onFrdLoaded])
 
-  // GitHub "Create FRD" URL
-  const frdRepo = 'cojakestein-sketch/tryps-docs'
-  const frdFileName = `docs/frds/${workstream.id}.md`
+  // GitHub URLs
+  const docRepo = 'cojakestein-sketch/tryps-docs'
+  const frdFileName = workstream.frdPath || `docs/frds/${workstream.id}.md`
+  const specFileName = workstream.specPath || `docs/specs/${workstream.id}.md`
   const frdTemplate = encodeURIComponent(
     `# ${workstream.name} — Functional Requirements\n\n## Overview\n[What is this workstream about?]\n\n## Requirements\n- [ ] Requirement 1\n- [ ] Requirement 2\n\n## Design\n[Links to Figma, mockups, etc.]\n\n## Notes\n[Any additional context]\n`
   )
-  const createFrdUrl = `https://github.com/${frdRepo}/new/main?filename=${frdFileName}&value=${frdTemplate}`
+  const specTemplate = encodeURIComponent(
+    `# ${workstream.name} — Spec\n\n## Intent\n[Why does this scope exist?]\n\n## Acceptance Criteria\n- [ ] Criterion 1\n- [ ] Criterion 2\n`
+  )
+  const createFrdUrl = `https://github.com/${docRepo}/new/main?filename=${frdFileName}&value=${frdTemplate}`
+  const createSpecUrl = `https://github.com/${docRepo}/new/main?filename=${specFileName}&value=${specTemplate}`
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg mx-2 mb-2 overflow-hidden shadow-sm">
@@ -67,54 +73,82 @@ export function AccordionDetail({ workstream, onTaskToggle, onFrdLoaded }: Accor
           )}
         </div>
 
-        {/* FRD Preview */}
+        {/* Documents: Spec + FRD tabs */}
         <div className="p-3">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          <div className="flex items-center gap-1 mb-2">
+            <button
+              onClick={() => setActiveDocTab('spec')}
+              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
+                activeDocTab === 'spec'
+                  ? 'bg-purple-100 text-purple-700'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              SPEC
+            </button>
+            <button
+              onClick={() => setActiveDocTab('frd')}
+              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
+                activeDocTab === 'frd'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
               FRD
-            </h4>
-            {workstream.frdContent && workstream.frdPath && (
-              <a
-                href={`https://github.com/${frdRepo}/blob/main/${frdFileName}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[9px] text-blue-500 hover:underline"
-              >
-                View on GitHub
-              </a>
+            </button>
+            {/* View on GitHub link */}
+            {activeDocTab === 'frd' && workstream.frdContent && workstream.frdPath && (
+              <a href={`https://github.com/${docRepo}/blob/main/${frdFileName}`} target="_blank" rel="noopener noreferrer" className="ml-auto text-[9px] text-blue-500 hover:underline">View on GitHub</a>
+            )}
+            {activeDocTab === 'spec' && workstream.specPath && (
+              <a href={`https://github.com/${docRepo}/blob/main/${specFileName}`} target="_blank" rel="noopener noreferrer" className="ml-auto text-[9px] text-purple-500 hover:underline">View on GitHub</a>
             )}
           </div>
-          {frdLoading ? (
-            <div className="flex items-center gap-2 text-xs text-gray-400">
-              <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Fetching FRD...
-            </div>
-          ) : frdError ? (
-            <p className="text-xs text-red-400 italic">Failed to load FRD</p>
-          ) : workstream.frdContent ? (
-            <div className="text-xs text-gray-700 max-h-40 overflow-y-auto prose prose-xs">
-              <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(workstream.frdContent) }} />
-            </div>
-          ) : workstream.frdPath ? (
-            <div className="text-center py-3">
-              <p className="text-xs text-gray-400 mb-2">FRD not created yet</p>
-              <a
-                href={createFrdUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-full transition-colors"
-              >
-                <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z" />
-                </svg>
-                Create FRD
-              </a>
-            </div>
+
+          {activeDocTab === 'spec' ? (
+            // Spec tab
+            workstream.specContent ? (
+              <div className="text-xs text-gray-700 max-h-40 overflow-y-auto prose prose-xs">
+                <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(workstream.specContent) }} />
+              </div>
+            ) : workstream.specPath ? (
+              <div className="text-center py-3">
+                <p className="text-xs text-gray-400 mb-2">Spec not created yet</p>
+                <a href={createSpecUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-full transition-colors">
+                  <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z" /></svg>
+                  Create Spec
+                </a>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 italic">No spec linked</p>
+            )
           ) : (
-            <p className="text-xs text-gray-400 italic">No FRD linked</p>
+            // FRD tab
+            frdLoading ? (
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Fetching FRD...
+              </div>
+            ) : frdError ? (
+              <p className="text-xs text-red-400 italic">Failed to load FRD</p>
+            ) : workstream.frdContent ? (
+              <div className="text-xs text-gray-700 max-h-40 overflow-y-auto prose prose-xs">
+                <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(workstream.frdContent) }} />
+              </div>
+            ) : workstream.frdPath ? (
+              <div className="text-center py-3">
+                <p className="text-xs text-gray-400 mb-2">FRD not created yet</p>
+                <a href={createFrdUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-full transition-colors">
+                  <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z" /></svg>
+                  Create FRD
+                </a>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 italic">No FRD linked</p>
+            )
           )}
         </div>
 

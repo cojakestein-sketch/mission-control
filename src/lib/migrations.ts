@@ -1659,6 +1659,156 @@ const migrations: Migration[] = [
         }
       }
     }
+  },
+  {
+    id: '048_p2_p3_scopes_and_spec_path',
+    up(db: Database.Database) {
+      const now = new Date().toISOString()
+
+      // 1. Add spec_path and spec_content columns
+      const cols = db.prepare(`PRAGMA table_info(workstreams)`).all() as { name: string }[]
+      if (!cols.some(c => c.name === 'spec_path')) {
+        db.exec(`ALTER TABLE workstreams ADD COLUMN spec_path TEXT`)
+      }
+      if (!cols.some(c => c.name === 'spec_content')) {
+        db.exec(`ALTER TABLE workstreams ADD COLUMN spec_content TEXT`)
+      }
+
+      // 2. Set spec_path for existing P1 scopes
+      const updateSpec = db.prepare('UPDATE workstreams SET spec_path = ? WHERE id = ?')
+      const p1Scopes = ['core-flows', 'tooltips-teaching', 'notifications-voting', 'post-trip-review', 'travel-dna', 'recommendations']
+      for (const name of p1Scopes) {
+        updateSpec.run(`scopes/p1/${name}/spec.md`, `p1-${name}`)
+      }
+
+      // 3. Insert P2 scopes
+      const insertWs = db.prepare(`
+        INSERT OR IGNORE INTO workstreams (id, name, category, assignee_id, start_date, end_date, status, color, frd_path, spec_path, progress, sort_order, parent_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      const p2Scopes = [
+        { id: 'p2-linq-imessage',     name: '1. iMessage via Linq',            start: '2026-03-22', end: '2026-04-05', color: '#7c3aed', status: 'not_started', order: 20 },
+        { id: 'p2-stripe-payments',   name: '2. Stripe Payments',              start: '2026-03-25', end: '2026-04-08', color: '#6366f1', status: 'not_started', order: 21 },
+        { id: 'p2-booking-links',     name: '3. Booking Links',                start: '2026-03-28', end: '2026-04-10', color: '#8b5cf6', status: 'not_started', order: 22 },
+        { id: 'p2-connectors',        name: '4. Travel Life Connectors',       start: '2026-04-01', end: '2026-04-12', color: '#a78bfa', status: 'not_started', order: 23 },
+      ]
+
+      for (const s of p2Scopes) {
+        const frdPath = `scopes/p2/${s.id.replace('p2-', '')}/frd.md`
+        const specPath = `scopes/p2/${s.id.replace('p2-', '')}/spec.md`
+        insertWs.run(s.id, s.name, 'scope', null, s.start, s.end, s.status, s.color, frdPath, specPath, 0, s.order, 'p2-payments', now, now)
+      }
+
+      // Update P2 dates to cover scopes
+      db.prepare(`UPDATE workstreams SET end_date = '2026-04-12' WHERE id = 'p2-payments'`).run()
+
+      // 4. Insert P3 scopes
+      const p3Scopes = [
+        { id: 'p3-vote-on-behalf',    name: '1. Vote on My Behalf',            start: '2026-04-05', end: '2026-04-15', color: '#ef4444', status: 'not_started', order: 30 },
+        { id: 'p3-pay-on-behalf',     name: '2. Pay on My Behalf (X-402)',     start: '2026-04-08', end: '2026-04-18', color: '#dc2626', status: 'not_started', order: 31 },
+        { id: 'p3-duffel-apis',       name: '3. Duffel API & Dependencies',    start: '2026-04-10', end: '2026-04-20', color: '#b91c1c', status: 'not_started', order: 32 },
+        { id: 'p3-logistics-agent',   name: '4. Logistics Agent',              start: '2026-04-12', end: '2026-04-22', color: '#991b1b', status: 'not_started', order: 33 },
+      ]
+
+      for (const s of p3Scopes) {
+        const frdPath = `scopes/p3/${s.id.replace('p3-', '')}/frd.md`
+        const specPath = `scopes/p3/${s.id.replace('p3-', '')}/spec.md`
+        insertWs.run(s.id, s.name, 'scope', null, s.start, s.end, s.status, s.color, frdPath, specPath, 0, s.order, 'p3-agents', now, now)
+      }
+
+      // Update P3 dates to cover scopes
+      db.prepare(`UPDATE workstreams SET end_date = '2026-04-22' WHERE id = 'p3-agents'`).run()
+
+      // 5. Insert sub-tasks for P2 scopes
+      const insertTask = db.prepare(`
+        INSERT OR IGNORE INTO workstream_tasks (id, workstream_id, title, status, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      // P2 Scope 1: Linq iMessage
+      const linqTasks = [
+        { id: 't-lq-01', title: 'Linq webhook integration (inbound message parsing)' },
+        { id: 't-lq-02', title: 'NL intent parser (activity, vote, RSVP, expense, query)' },
+        { id: 't-lq-03', title: 'Outbound message API (replies, proactive notifications, blasts)' },
+        { id: 't-lq-04', title: 'Group chat ↔ trip mapping (conversation_id → trip_id)' },
+        { id: 't-lq-05', title: 'User identity mapping (iMessage phone → Tryps user)' },
+        { id: 't-lq-06', title: 'Delivery status webhooks & retry logic' },
+      ]
+      linqTasks.forEach((t, i) => insertTask.run(t.id, 'p2-linq-imessage', t.title, 'todo', i, now, now))
+
+      // P2 Scope 2: Stripe Payments
+      const stripeTasks = [
+        { id: 't-sp-01', title: 'Stripe Connect setup (platform account + connected accounts)' },
+        { id: 't-sp-02', title: 'In-app payment flow (settle expense balance)' },
+        { id: 't-sp-03', title: 'Payment tracking UI (paid/unpaid status per expense)' },
+        { id: 't-sp-04', title: 'Vercel billing implications research & architecture' },
+        { id: 't-sp-05', title: 'Payout scheduling & settlement reconciliation' },
+      ]
+      stripeTasks.forEach((t, i) => insertTask.run(t.id, 'p2-stripe-payments', t.title, 'todo', i, now, now))
+
+      // P2 Scope 3: Booking Links
+      const bookingTasks = [
+        { id: 't-bl-01', title: 'Booking link embed system (Stay, Activities, Flights tabs)' },
+        { id: 't-bl-02', title: 'Pre-filled partner links (dates, location, group size)' },
+        { id: 't-bl-03', title: 'Affiliate/referral tracking per booking click' },
+        { id: 't-bl-04', title: 'Booking confirmation callback & trip card update' },
+      ]
+      bookingTasks.forEach((t, i) => insertTask.run(t.id, 'p2-booking-links', t.title, 'todo', i, now, now))
+
+      // P2 Scope 4: Connectors
+      const connectorTasks = [
+        { id: 't-cn-01', title: 'Airline account linking (United, Delta, AA loyalty numbers)' },
+        { id: 't-cn-02', title: 'Hotel loyalty linking (Marriott, Hilton, Airbnb)' },
+        { id: 't-cn-03', title: 'ChatGPT custom prompt integration (user sends travel context)' },
+        { id: 't-cn-04', title: 'Connector framework (OAuth + API key patterns)' },
+        { id: 't-cn-05', title: 'Import existing bookings from connected accounts' },
+      ]
+      connectorTasks.forEach((t, i) => insertTask.run(t.id, 'p2-connectors', t.title, 'todo', i, now, now))
+
+      // P3 Scope 1: Vote on My Behalf
+      const voteTasks = [
+        { id: 't-vb-01', title: 'Agent learns user preferences from Travel DNA + vote history' },
+        { id: 't-vb-02', title: 'Auto-vote inference engine (predict user vote before 48h deadline)' },
+        { id: 't-vb-03', title: 'Pre-deadline nudge: "I think you\'d pick Option B — change it?"' },
+        { id: 't-vb-04', title: '48-hour auto-vote fallback (agent votes if user doesn\'t)' },
+        { id: 't-vb-05', title: 'Confidence scoring (high/medium/low certainty on inferred vote)' },
+        { id: 't-vb-06', title: 'Opt-in/opt-out per trip and per category (activities, dates, locations)' },
+      ]
+      voteTasks.forEach((t, i) => insertTask.run(t.id, 'p3-vote-on-behalf', t.title, 'todo', i, now, now))
+
+      // P3 Scope 2: Pay on My Behalf (X-402)
+      const payTasks = [
+        { id: 't-xp-01', title: 'X-402 protocol research & integration design' },
+        { id: 't-xp-02', title: 'Tryps Cash wallet system (per-trip agent execution budget)' },
+        { id: 't-xp-03', title: 'Micropayment flow: agent hits API → HTTP 402 → X-402 pays → result' },
+        { id: 't-xp-04', title: 'Cost logging per trip (track agent spend for future billing)' },
+        { id: 't-xp-05', title: 'Budget limits & approval thresholds per trip' },
+      ]
+      payTasks.forEach((t, i) => insertTask.run(t.id, 'p3-pay-on-behalf', t.title, 'todo', i, now, now))
+
+      // P3 Scope 3: Duffel API & Dependencies
+      const duffelTasks = [
+        { id: 't-df-01', title: 'Duffel API integration (flight search, booking, ticketing)' },
+        { id: 't-df-02', title: 'Amadeus API evaluation (backup flight provider)' },
+        { id: 't-df-03', title: 'Restaurant/activity API research (OpenTable, Viator, GetYourGuide)' },
+        { id: 't-df-04', title: 'Hotel API integration (Booking.com affiliate or Duffel stays)' },
+        { id: 't-df-05', title: 'API credential management & rate limit handling' },
+      ]
+      duffelTasks.forEach((t, i) => insertTask.run(t.id, 'p3-duffel-apis', t.title, 'todo', i, now, now))
+
+      // P3 Scope 4: Logistics Agent
+      const logisticsTasks = [
+        { id: 't-la-01', title: 'Agent task creation from trip card buttons & empty states' },
+        { id: 't-la-02', title: 'Ranked options display (Citymapper-style: cost, time, details)' },
+        { id: 't-la-03', title: 'Group voting on agent options (48h window, majority wins)' },
+        { id: 't-la-04', title: 'Booking confirmation flow (agent → API → trip card update)' },
+        { id: 't-la-05', title: 'Error recovery (sold out → auto-alternatives, API down → retry)' },
+        { id: 't-la-06', title: 'Free-text chat trigger (NL → agent task)' },
+        { id: 't-la-07', title: 'Duplicate request deduplication' },
+      ]
+      logisticsTasks.forEach((t, i) => insertTask.run(t.id, 'p3-logistics-agent', t.title, 'todo', i, now, now))
+    }
   }
 ]
 

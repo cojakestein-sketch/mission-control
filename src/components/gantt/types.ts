@@ -10,6 +10,8 @@ export interface Workstream {
   color: string | null
   frdPath: string | null
   frdContent: string | null
+  specPath: string | null
+  specContent: string | null
   progress: number // 0.0 - 1.0
   sortOrder: number
   deepWorkCompleted: boolean

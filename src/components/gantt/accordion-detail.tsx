@@ -320,20 +320,21 @@ function StepContent({
       if (!hasSpec) {
         return (
           <div className="text-center py-3">
-            <p className="text-xs text-gray-400">Complete the Spec first — the FRD is auto-generated from it.</p>
+            <p className="text-xs text-gray-400 mb-1">Complete the Spec first — the FRD is auto-generated from it.</p>
+            <p className="text-[9px] text-gray-400">The Spec interview prompt (Step 1) will auto-trigger FRD generation.</p>
           </div>
         )
       }
 
       return (
         <div className="text-center py-3">
-          <p className="text-xs text-gray-400 mb-2">Spec is ready — generate the FRD</p>
+          <p className="text-xs text-gray-400 mb-2">Spec is ready — generate the FRD and save it here</p>
           <CopyPromptButton
             color="blue"
             label="Generate FRD"
             prompt={buildFrdPrompt(workstream.name, workstream.id, specPath || '', frdFileName)}
           />
-          <p className="text-[9px] text-gray-400 mt-1.5">Copies a prompt to your clipboard. Paste into Claude Code.</p>
+          <p className="text-[9px] text-gray-400 mt-1.5">Copies a prompt to your clipboard. Paste into Claude Code. The FRD will be saved into this pipeline section.</p>
         </div>
       )
     }
@@ -580,9 +581,14 @@ Run /spec to interview me about this scope. I'll describe what I want and you'll
 - **Acceptance Criteria**: Checkboxes for what "done" looks like
 - **Constraints**: Any technical or timeline constraints
 
-When the spec is complete, save it to the tryps-docs repo at ${specPath}.
+When the spec is complete:
+1. Save the spec to the tryps-docs repo at \`${specPath}\`
+2. Update Mission Control's pipeline so it appears in the SPEC section:
+   curl -X PATCH "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/spec" \\
+     -H "Content-Type: application/json" \\
+     -d "$(jq -n --arg content "$(cat ${specPath})" --arg status ready --arg specPath "${specPath}" '{status: $status, content: $content, meta: {specPath: $specPath}}')"
 
-Then AUTOMATICALLY generate the FRD (Step 2) from the spec — expand my intent into detailed functional requirements: every screen, field, edge case, and API contract. Save the FRD next to the spec.
+Then AUTOMATICALLY generate the FRD (Step 2) from the spec — expand my intent into detailed functional requirements: every screen, field, edge case, and API contract. Save the FRD into Mission Control's FRD pipeline section (see FRD prompt instructions).
 
 Let's go — start the interview.`
 }
@@ -590,14 +596,21 @@ Let's go — start the interview.`
 function buildFrdPrompt(scopeName: string, scopeId: string, specPath: string, frdPath: string): string {
   return `Generate the FRD for "${scopeName}" (${scopeId}).
 
-Read the spec at ${specPath} in the tryps-docs repo. Expand it into a detailed Functional Requirements Document:
+Read the spec at \`${specPath}\` in the tryps-docs repo (or fetch from Mission Control: GET https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/spec).
+
+Expand the spec into a detailed Functional Requirements Document:
 - Every screen referenced (with field lists)
 - Edge cases and error states
 - API contracts (endpoints, payloads)
 - Data model changes needed
 - Acceptance test scenarios
 
-Save the FRD to ${frdPath} in the tryps-docs repo.
+When the FRD is complete, save it to BOTH locations:
+1. Save to tryps-docs repo at \`${frdPath}\` (for GitHub reference)
+2. Save into Mission Control's FRD pipeline section so it's immediately visible:
+   curl -X PATCH "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/frd" \\
+     -H "Content-Type: application/json" \\
+     -d "$(jq -n --arg content "$(cat ${frdPath})" --arg status ready --arg frdPath "${frdPath}" '{status: $status, content: $content, meta: {frdPath: $frdPath}}')"
 
 After the FRD is saved, continue the pipeline: suggest running /pencil (Step 2a) if the FRD references UI screens, or /lfg (Steps 3-6) if it's backend-only.`
 }

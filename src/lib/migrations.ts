@@ -1480,6 +1480,34 @@ const migrations: Migration[] = [
       }
     }
   }
+  {
+    id: '046_post_trip_and_logistics_scopes',
+    up(db: Database.Database) {
+      const now = new Date().toISOString()
+
+      const insertWs = db.prepare(`
+        INSERT OR IGNORE INTO workstreams (id, name, category, assignee_id, start_date, end_date, status, color, frd_path, progress, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      // Post-Trip Review scope
+      insertWs.run('post-trip-review', 'Post-Trip Review', 'scope', null, '2026-03-25', '2026-04-02', 'not_started', '#e11d48', 'docs/frds/post-trip-review.md', 0, 20, now, now)
+
+      // Tryps Logistics Agent scope
+      insertWs.run('logistics-agent', 'Tryps Logistics Agent', 'scope', null, '2026-03-28', '2026-04-02', 'not_started', '#0ea5e9', 'docs/frds/logistics-agent.md', 0, 21, now, now)
+
+      // Sub-features for Post-Trip Review
+      const insertTask = db.prepare(`
+        INSERT OR IGNORE INTO workstream_tasks (id, workstream_id, title, status, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      insertTask.run('t-ptr-1', 'post-trip-review', 'Time Capsule / Montage Video — Snapchat-style group montage, view-once, 60s clipped version', 'todo', 0, now, now)
+      insertTask.run('t-ptr-2', 'post-trip-review', 'Sentiment Analysis — NLP trip recaps in natural language', 'todo', 1, now, now)
+      insertTask.run('t-ptr-3', 'post-trip-review', 'Tryps Review System — like/dislike/feedback for trips', 'todo', 2, now, now)
+      insertTask.run('t-ptr-4', 'post-trip-review', 'Trip Cash / Miles Rewards — earn miles per trip (real distance from home airport), rewards for DNA quiz & data collection, funds X-402 API calls', 'todo', 3, now, now)
+    }
+  }
 ]
 
 export function runMigrations(db: Database.Database) {

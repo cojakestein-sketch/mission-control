@@ -1479,7 +1479,7 @@ const migrations: Migration[] = [
         update.run(path, id)
       }
     }
-  }
+  },
   {
     id: '046_post_trip_and_logistics_scopes',
     up(db: Database.Database) {

@@ -58,6 +58,26 @@ function formatStatus(status: string): string {
   return status.replace(/_/g, ' ').replace(/-/g, ' ')
 }
 
+const DOC_REPO = 'cojakestein-sketch/tryps-docs'
+
+function getStepGitHubUrl(stepKey: PipelineStepKey, pipeline: Workstream['pipeline'], workstream: Workstream): string | null {
+  if (stepKey === 'spec') {
+    const meta = pipeline.spec?.meta as Record<string, unknown> | null
+    const specPath = (meta?.specPath as string) || workstream.specPath
+    if (specPath) return `https://github.com/${DOC_REPO}/blob/main/${specPath}`
+  }
+  if (stepKey === 'frd') {
+    const meta = pipeline.frd?.meta as Record<string, unknown> | null
+    const frdPath = (meta?.frdPath as string) || workstream.frdPath
+    if (frdPath) return `https://github.com/${DOC_REPO}/blob/main/${frdPath}`
+  }
+  if (stepKey === 'merge_pr') {
+    const meta = pipeline.merge_pr?.meta as Record<string, unknown> | null
+    return (meta?.prUrl as string) || null
+  }
+  return null
+}
+
 export function AccordionDetail({ workstream, onFrdLoaded }: AccordionDetailProps) {
   const pipeline = workstream.pipeline
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
@@ -142,13 +162,14 @@ export function AccordionDetail({ workstream, onFrdLoaded }: AccordionDetailProp
           const isExpanded = expandedSteps.has(step.key)
           const isCompleted = COMPLETED_STATUSES.has(status)
           const isLast = idx === visibleSteps.length - 1
+          const githubUrl = getStepGitHubUrl(step.key, pipeline, workstream)
 
           return (
             <div key={step.key} className="relative">
               {/* Step row */}
-              <button
+              <div
+                className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors cursor-pointer"
                 onClick={() => toggleStep(step.key)}
-                className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-left"
               >
                 {/* Circle + connector line */}
                 <div className="relative flex flex-col items-center shrink-0" style={{ width: 24 }}>
@@ -173,9 +194,20 @@ export function AccordionDetail({ workstream, onFrdLoaded }: AccordionDetailProp
                   )}
                 </div>
 
-                {/* Title */}
-                <span className="text-[11px] font-semibold text-gray-700 tracking-wide flex-1">
+                {/* Title + inline GitHub link */}
+                <span className="text-[11px] font-semibold text-gray-700 tracking-wide flex-1 flex items-center gap-2">
                   {step.label}
+                  {githubUrl && (
+                    <a
+                      href={githubUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[9px] font-medium text-blue-500 hover:text-blue-700 hover:underline"
+                    >
+                      GitHub &rarr;
+                    </a>
+                  )}
                 </span>
 
                 {/* Status badge */}
@@ -191,7 +223,7 @@ export function AccordionDetail({ workstream, onFrdLoaded }: AccordionDetailProp
                 >
                   <path d="M6 3l5 5-5 5V3z" />
                 </svg>
-              </button>
+              </div>
 
               {/* Expanded content */}
               {isExpanded && (

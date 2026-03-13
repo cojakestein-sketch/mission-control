@@ -1974,6 +1974,49 @@ const migrations: Migration[] = [
         WHERE category = 'scope'
       `)
     }
+  },
+  {
+    id: '051_compress_timelines_april2',
+    up: (db) => {
+      const now = new Date().toISOString()
+      const deadline = '2026-04-02'
+      const update = db.prepare('UPDATE workstreams SET start_date = ?, end_date = ?, updated_at = ? WHERE id = ?')
+
+      // P1: Core App — Mar 9 to Apr 2 (full window, already in progress)
+      update.run('2026-03-09', deadline, now, 'p1-core')
+      update.run('2026-03-09', '2026-03-21', now, 'p1-core-flows')        // 1. in progress, needs most time
+      update.run('2026-03-19', '2026-03-25', now, 'p1-tooltips-teaching')  // 2. overlaps with tail of core flows
+      update.run('2026-03-19', '2026-03-26', now, 'p1-notifications-voting') // 3. parallel with tooltips
+      update.run('2026-03-24', '2026-03-30', now, 'p1-post-trip-review')   // 4.
+      update.run('2026-03-22', '2026-03-28', now, 'p1-travel-dna')        // 5.
+      update.run('2026-03-26', deadline, now, 'p1-recommendations')        // 6. last P1 scope
+
+      // P2: Stripe + Linq — Mar 16 to Apr 2
+      update.run('2026-03-16', deadline, now, 'p2-payments')
+      update.run('2026-03-16', '2026-03-25', now, 'p2-linq-imessage')     // 1.
+      update.run('2026-03-20', '2026-03-28', now, 'p2-stripe-payments')   // 2.
+      update.run('2026-03-24', '2026-03-31', now, 'p2-booking-links')     // 3.
+      update.run('2026-03-27', deadline, now, 'p2-connectors')            // 4.
+
+      // P3: Agent Layer — Mar 20 to Apr 2
+      update.run('2026-03-20', deadline, now, 'p3-agents')
+      update.run('2026-03-20', '2026-03-27', now, 'p3-vote-on-behalf')    // 1.
+      update.run('2026-03-23', '2026-03-30', now, 'p3-pay-on-behalf')     // 2.
+      update.run('2026-03-25', deadline, now, 'p3-duffel-apis')           // 3.
+      update.run('2026-03-27', deadline, now, 'p3-logistics-agent')       // 4.
+
+      // P4: Brand & GTM — Mar 23 to Apr 2
+      update.run('2026-03-23', deadline, now, 'p4-brand-gtm')
+      update.run('2026-03-23', '2026-03-29', now, 'p4-socials-presence')   // 1.
+      update.run('2026-03-25', '2026-03-31', now, 'p4-wispr-playbook')    // 2.
+      update.run('2026-03-27', deadline, now, 'p4-referral-incentives')   // 3.
+      update.run('2026-03-29', deadline, now, 'p4-giveaways')            // 4.
+
+      // P5: V2 Beta — Mar 26 to Apr 2
+      update.run('2026-03-26', deadline, now, 'p5-v2-beta')
+      update.run('2026-03-26', '2026-03-31', now, 'p5-friends-family')    // 1.
+      update.run('2026-03-28', deadline, now, 'p5-strangers-review')      // 2.
+    }
   }
 ]
 

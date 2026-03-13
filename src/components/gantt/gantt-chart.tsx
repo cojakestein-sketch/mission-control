@@ -42,6 +42,7 @@ let toastTimeout: ReturnType<typeof setTimeout> | null = null
 
 export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragReschedule, onFrdLoaded }: GanttChartProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [dragDeltaX, setDragDeltaX] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
@@ -94,6 +95,18 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
     })
   }, [])
 
+  const togglePhaseCollapse = useCallback((phaseId: string) => {
+    setCollapsedPhases(prev => {
+      const next = new Set(prev)
+      if (next.has(phaseId)) {
+        next.delete(phaseId)
+      } else {
+        next.add(phaseId)
+      }
+      return next
+    })
+  }, [])
+
   const phases = workstreams.filter(ws => ws.category === 'phase')
   const scopes = workstreams.filter(ws => ws.category === 'scope')
 
@@ -127,11 +140,13 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
       h += 32 // phase group header
       h += ROW_HEIGHT // phase row
       if (expandedIds.has(phase.id)) h += EXPANDED_ESTIMATE
-      const childScopes = scopesByPhase.get(phase.id) || []
-      if (childScopes.length > 0) {
-        for (const scope of childScopes) {
-          h += ROW_HEIGHT
-          if (expandedIds.has(scope.id)) h += EXPANDED_ESTIMATE
+      if (!collapsedPhases.has(phase.id)) {
+        const childScopes = scopesByPhase.get(phase.id) || []
+        if (childScopes.length > 0) {
+          for (const scope of childScopes) {
+            h += ROW_HEIGHT
+            if (expandedIds.has(scope.id)) h += EXPANDED_ESTIMATE
+          }
         }
       }
     }
@@ -217,11 +232,24 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
 
             {phases.map(phase => {
               const childScopes = scopesByPhase.get(phase.id) || []
+              const isPhaseCollapsed = collapsedPhases.has(phase.id)
               return (
                 <div key={phase.id}>
-                  {/* Phase header with scope count */}
-                  <div className="h-8 flex items-center justify-between px-3 bg-red-50/50 border-b border-gray-100">
-                    <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider">{phase.name}</span>
+                  {/* Phase header with scope count + collapse toggle */}
+                  <div
+                    className="h-8 flex items-center justify-between px-3 bg-red-50/50 border-b border-gray-100 cursor-pointer hover:bg-red-50"
+                    onClick={() => togglePhaseCollapse(phase.id)}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <svg
+                        className={`w-2.5 h-2.5 text-red-400 transition-transform duration-150 ${isPhaseCollapsed ? '' : 'rotate-90'}`}
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                      >
+                        <path d="M6 3l5 5-5 5V3z" />
+                      </svg>
+                      <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider">{phase.name}</span>
+                    </div>
                     {childScopes.length > 0 && (
                       <span className="text-[9px] font-semibold text-red-400 bg-red-100 px-1.5 py-0.5 rounded-full">
                         {childScopes.length} scope{childScopes.length !== 1 ? 's' : ''}
@@ -234,8 +262,8 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
                     onToggle={() => toggleExpand(phase.id)}
                     onStatusClick={(e) => handleStatusClick(phase, e)}
                   />
-                  {/* Child scopes under this phase */}
-                  {childScopes.length > 0 && (
+                  {/* Child scopes under this phase — hidden when phase collapsed */}
+                  {!isPhaseCollapsed && childScopes.length > 0 && (
                     <div className="border-l-2 border-red-200 ml-4">
                       {childScopes.map(ws => (
                         <WorkstreamLabel
@@ -311,6 +339,7 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
                 {/* Phase rows with child scopes */}
                 {phases.map(phase => {
                   const childScopes = scopesByPhase.get(phase.id) || []
+                  const isPhaseCollapsed = collapsedPhases.has(phase.id)
                   return (
                     <div key={phase.id}>
                       <div className="h-8" />
@@ -326,7 +355,7 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
                         isDragging={activeDragId === phase.id}
                         dragDeltaX={activeDragId === phase.id ? dragDeltaX : 0}
                       />
-                      {childScopes.map((ws, idx) => (
+                      {!isPhaseCollapsed && childScopes.map((ws, idx) => (
                         <WorkstreamRow
                           key={ws.id}
                           workstream={ws}

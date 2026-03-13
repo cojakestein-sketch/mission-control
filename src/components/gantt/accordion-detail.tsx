@@ -263,20 +263,11 @@ function StepContent({
     case 'spec': {
       const specPath = (meta?.specPath as string) || workstream.specPath
       const specContent = step?.content || workstream.specContent
-      const specFileName = specPath || `docs/specs/${workstream.id}.md`
-      const specTemplate = encodeURIComponent(
-        `# ${workstream.name} — Spec\n\n## Intent\n[Why does this scope exist?]\n\n## Acceptance Criteria\n- [ ] Criterion 1\n- [ ] Criterion 2\n`
-      )
-      const createSpecUrl = `https://github.com/${docRepo}/new/main?filename=${specFileName}&value=${specTemplate}`
+      const specFileName = specPath || `scopes/${workstream.id}/spec.md`
 
       if (specContent) {
         return (
           <div>
-            {specPath && (
-              <a href={`https://github.com/${docRepo}/blob/main/${specFileName}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-purple-500 hover:underline mb-2 inline-block">
-                View on GitHub
-              </a>
-            )}
             <div className="text-xs text-gray-700 max-h-48 overflow-y-auto prose prose-xs">
               <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(specContent) }} />
             </div>
@@ -286,10 +277,12 @@ function StepContent({
       return (
         <div className="text-center py-3">
           <p className="text-xs text-gray-400 mb-2">Spec not created yet</p>
-          <a href={createSpecUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-full transition-colors">
-            <PlusIcon />
-            Create Spec
-          </a>
+          <CopyPromptButton
+            color="purple"
+            label="Start Spec Interview"
+            prompt={buildSpecPrompt(workstream.name, workstream.id, specFileName)}
+          />
+          <p className="text-[9px] text-gray-400 mt-1.5">Copies a prompt to your clipboard. Paste into Claude Code.</p>
         </div>
       )
     }
@@ -297,11 +290,10 @@ function StepContent({
     case 'frd': {
       const frdPath = (meta?.frdPath as string) || workstream.frdPath
       const frdContent = step?.content || workstream.frdContent
-      const frdFileName = frdPath || `docs/frds/${workstream.id}.md`
-      const frdTemplate = encodeURIComponent(
-        `# ${workstream.name} — Functional Requirements\n\n## Overview\n[What is this workstream about?]\n\n## Requirements\n- [ ] Requirement 1\n- [ ] Requirement 2\n\n## Design\n[Links to Figma, mockups, etc.]\n\n## Notes\n[Any additional context]\n`
-      )
-      const createFrdUrl = `https://github.com/${docRepo}/new/main?filename=${frdFileName}&value=${frdTemplate}`
+      const specPath = (workstream.pipeline?.spec?.meta as Record<string, unknown> | null)?.specPath as string | undefined
+        || workstream.specPath
+      const frdFileName = frdPath || `scopes/${workstream.id}/frd.md`
+      const hasSpec = !!(workstream.pipeline?.spec?.content || workstream.specContent)
 
       if (frdLoading) {
         return (
@@ -318,11 +310,6 @@ function StepContent({
       if (frdContent) {
         return (
           <div>
-            {frdPath && (
-              <a href={`https://github.com/${docRepo}/blob/main/${frdFileName}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:underline mb-2 inline-block">
-                View on GitHub
-              </a>
-            )}
             <div className="text-xs text-gray-700 max-h-48 overflow-y-auto prose prose-xs">
               <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(frdContent) }} />
             </div>
@@ -330,13 +317,23 @@ function StepContent({
         )
       }
 
+      if (!hasSpec) {
+        return (
+          <div className="text-center py-3">
+            <p className="text-xs text-gray-400">Complete the Spec first — the FRD is auto-generated from it.</p>
+          </div>
+        )
+      }
+
       return (
         <div className="text-center py-3">
-          <p className="text-xs text-gray-400 mb-2">FRD not created yet</p>
-          <a href={createFrdUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-full transition-colors">
-            <PlusIcon />
-            Create FRD
-          </a>
+          <p className="text-xs text-gray-400 mb-2">Spec is ready — generate the FRD</p>
+          <CopyPromptButton
+            color="blue"
+            label="Generate FRD"
+            prompt={buildFrdPrompt(workstream.name, workstream.id, specPath || '', frdFileName)}
+          />
+          <p className="text-[9px] text-gray-400 mt-1.5">Copies a prompt to your clipboard. Paste into Claude Code.</p>
         </div>
       )
     }
@@ -533,12 +530,76 @@ function EmptyState({ text }: { text: string }) {
   )
 }
 
-function PlusIcon() {
+function CopyPromptButton({ color, label, prompt }: { color: 'purple' | 'blue' | 'amber' | 'green'; label: string; prompt: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const colorClasses = {
+    purple: 'text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100',
+    blue: 'text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100',
+    amber: 'text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100',
+    green: 'text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100',
+  }
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(prompt).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
   return (
-    <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
-      <path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z" />
-    </svg>
+    <button
+      onClick={handleCopy}
+      className={`inline-flex items-center gap-1 text-[10px] font-medium px-2.5 py-1 rounded-full transition-colors ${colorClasses[color]}`}
+    >
+      {copied ? (
+        <>
+          <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z" />
+          </svg>
+          Copied!
+        </>
+      ) : (
+        <>
+          <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" />
+            <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" />
+          </svg>
+          {label}
+        </>
+      )}
+    </button>
   )
+}
+
+function buildSpecPrompt(scopeName: string, scopeId: string, specPath: string): string {
+  return `You're starting the scope pipeline for "${scopeName}" (${scopeId}).
+
+Run /spec to interview me about this scope. I'll describe what I want and you'll write a structured spec with:
+- **Intent**: Why this scope exists (2-3 sentences)
+- **Acceptance Criteria**: Checkboxes for what "done" looks like
+- **Constraints**: Any technical or timeline constraints
+
+When the spec is complete, save it to the tryps-docs repo at ${specPath}.
+
+Then AUTOMATICALLY generate the FRD (Step 2) from the spec — expand my intent into detailed functional requirements: every screen, field, edge case, and API contract. Save the FRD next to the spec.
+
+Let's go — start the interview.`
+}
+
+function buildFrdPrompt(scopeName: string, scopeId: string, specPath: string, frdPath: string): string {
+  return `Generate the FRD for "${scopeName}" (${scopeId}).
+
+Read the spec at ${specPath} in the tryps-docs repo. Expand it into a detailed Functional Requirements Document:
+- Every screen referenced (with field lists)
+- Edge cases and error states
+- API contracts (endpoints, payloads)
+- Data model changes needed
+- Acceptance test scenarios
+
+Save the FRD to ${frdPath} in the tryps-docs repo.
+
+After the FRD is saved, continue the pipeline: suggest running /pencil (Step 2a) if the FRD references UI screens, or /lfg (Steps 3-6) if it's backend-only.`
 }
 
 // Very simple markdown to HTML (headers, bold, lists, code)

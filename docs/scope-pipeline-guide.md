@@ -56,9 +56,9 @@ If review fails, Claude fixes and re-reviews. You don't need to intervene.
 
 ---
 
-## Step 7 — MERGE PR (You)
+## Step 7 — AGENT READY FOR DEV REVIEW (You)
 
-Create a PR on GitHub. Create a ClickUp task. Assign to Asif or Nadeem.
+Agent work is done. Create a PR on GitHub. Create a ClickUp task. Assign to Asif or Nadeem.
 Write a dev briefing: key files, specific questions, context.
 Paste the PR URL and ClickUp ID into Mission Control.
 
@@ -94,7 +94,7 @@ Mark as approved in Mission Control. Scope complete.
 | 2. FRD | Claude (auto) | Auto-generated from spec | 5 min |
 | 2a. Design | Claude | `/pencil` | 20 min |
 | 3-6. Plan→Compound | Claude | `/lfg` | 20-40 min |
-| 7. Merge PR | You | GitHub PR + ClickUp task | 10 min |
+| 7. Agent Ready | You | GitHub PR + ClickUp task | 10 min |
 | 8. Feedback | Dev | PR review | 30 min |
 | 9. Fixes | Claude | Read feedback → fix | 15 min |
 | 10. Merged | Dev | Approve + merge | 5 min |

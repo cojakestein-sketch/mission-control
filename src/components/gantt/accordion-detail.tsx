@@ -24,7 +24,7 @@ const PIPELINE_STEPS: {
   { key: 'work', label: 'WORK', number: '4', color: '#d97706' },
   { key: 'review', label: 'REVIEW', number: '5', color: '#d97706' },
   { key: 'compound', label: 'COMPOUND LEARNINGS', number: '6', color: '#d97706' },
-  { key: 'merge_pr', label: 'MERGE PR', number: '7', color: '#16a34a' },
+  { key: 'merge_pr', label: 'AGENT READY FOR DEV REVIEW', number: '7', color: '#16a34a' },
   { key: 'dev_feedback', label: 'DEV FEEDBACK', number: '8', color: '#dc2626' },
   { key: 'post_dev_fixes', label: 'FIXES & LEARNINGS', number: '9', color: '#d97706' },
   { key: 'merge_status', label: 'MERGED?', number: '10', color: '#16a34a' },

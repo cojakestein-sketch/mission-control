@@ -500,7 +500,38 @@ function StepContent({
       )
     }
 
-    // Generic markdown content steps: plan, compound, post_dev_fixes
+    case 'plan': {
+      if (!step?.content || step.status === 'not_started') {
+        const parts = workstream.id.split('-')
+        const phase = parts[0]
+        const scopeName = parts.slice(1).join('-')
+        const scopePath = `${phase}/${scopeName}`
+
+        return (
+          <div className="text-center py-3">
+            <p className="text-xs text-gray-400 mb-2">Spec &amp; FRD approved — run the autonomous pipeline</p>
+            <CopyPromptButton
+              color="amber"
+              label="Run Autonomous Pipeline (Steps 3→7)"
+              prompt={buildAutonomousPipelinePrompt(workstream.name, workstream.id, scopePath, scopeName)}
+            />
+            <p className="text-[9px] text-gray-400 mt-1.5">Copies prompt to clipboard. Paste into Claude Code. Runs Plan → Work → Review → Compound → PR autonomously.</p>
+          </div>
+        )
+      }
+      return (
+        <div>
+          {step.generatedAt && (
+            <p className="text-[9px] text-gray-400 mb-1">Generated {new Date(step.generatedAt).toLocaleDateString()}</p>
+          )}
+          <div className="text-xs text-gray-700 max-h-32 overflow-y-auto">
+            <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(step.content) }} />
+          </div>
+        </div>
+      )
+    }
+
+    // Generic markdown content steps: compound, post_dev_fixes
     default: {
       if (!step?.content) return <EmptyState text="Not started" />
       return (
@@ -613,6 +644,60 @@ When the FRD is complete, save it to BOTH locations:
      -d "$(jq -n --arg content "$(cat ${frdPath})" --arg status ready --arg frdPath "${frdPath}" '{status: $status, content: $content, meta: {frdPath: $frdPath}}')"
 
 After the FRD is saved, continue the pipeline: suggest running /pencil (Step 2a) if the FRD references UI screens, or /lfg (Steps 3-6) if it's backend-only.`
+}
+
+function buildAutonomousPipelinePrompt(scopeName: string, scopeId: string, scopePath: string, feature: string): string {
+  const scopeDir = `/Users/jakestein/tryps-docs/scopes/${scopePath}`
+  const branch = `feat/${feature}`
+
+  return `Run the autonomous scope pipeline for "${scopeName}" (${scopeId}), Steps 3 through 7.
+
+Variables:
+- SCOPE_PATH="${scopePath}"
+- FEATURE="${feature}"
+- SCOPE_DIR="${scopeDir}"
+- BRANCH="${branch}"
+- WORKSTREAM_ID="${scopeId}"
+
+The spec and FRD are already approved:
+- ${scopeDir}/spec.md
+- ${scopeDir}/frd.md
+
+For each step (3 through 7), run it as a separate \`claude -p\` session for context isolation.
+Use the prompt templates in \`_private/tools/vision/prompts/\`.
+
+Step 3 (Plan): template plan.md, --max-turns 30
+Verify: ${scopeDir}/plan.md exists and is >300 bytes.
+
+Step 4 (Work): template work.md, --max-turns 100
+Verify: branch ${branch} exists, ${scopeDir}/work.md exists, typecheck passed.
+
+Step 5 (Review): template review.md, --max-turns 40
+Verify: ${scopeDir}/review.md exists.
+If verdict is FAIL, re-run Step 4 with re-work prompt, then re-run Step 5. Max 2 retries.
+
+Step 6 (Compound): template compound.md, --max-turns 50
+Verify: ${scopeDir}/compound-learnings.md exists, typecheck passes.
+
+Step 7 (Agent Ready): template agent-ready.md, --max-turns 20
+Verify: ${scopeDir}/agent-ready.md exists, PR URL is in file.
+
+For each step, substitute these variables in the template:
+- {{FEATURE}} → ${feature}
+- {{SCOPE_DIR}} → ${scopeDir}
+- {{BRANCH}} → ${branch}
+- {{WORKSTREAM_ID}} → ${scopeId}
+
+After each step, update Mission Control:
+curl -s -X PATCH -H "Authorization: Bearer $(cat ~/.mission-control-api-key)" -H "Content-Type: application/json" "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/{step_key}" -d '{"status": "{status}", "content": "..."}'
+
+After each step print: [pipeline] ✓ Step N: {name} complete
+If failed: [pipeline] ✗ Step N: {name} FAILED — print last 20 lines of log, stop.
+
+After Step 7, print the final report with all artifact paths and PR URL.
+Open ${scopeDir}/agent-ready.md in Marked 2.
+
+Do NOT ask me anything. Run all steps autonomously.`
 }
 
 // Very simple markdown to HTML (headers, bold, lists, code)

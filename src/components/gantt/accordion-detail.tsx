@@ -666,20 +666,20 @@ The spec and FRD are already approved:
 For each step (3 through 7), run it as a separate \`claude -p\` session for context isolation.
 Use the prompt templates in \`_private/tools/vision/prompts/\`.
 
-Step 3 (Plan): template plan.md, --max-turns 30
+Step 3 (Plan): Use /workflows:plan with the FRD as input. template plan.md, --max-turns 30
 Verify: ${scopeDir}/plan.md exists and is >300 bytes.
 
-Step 4 (Work): template work.md, --max-turns 100
+Step 4 (Work): Use /workflows:work with the plan. template work.md, --max-turns 100
 Verify: branch ${branch} exists, ${scopeDir}/work.md exists, typecheck passed.
 
-Step 5 (Review): template review.md, --max-turns 40
+Step 5 (Review): Use /workflows:review for code quality, PLUS verify spec criteria. template review.md, --max-turns 40
 Verify: ${scopeDir}/review.md exists.
 If verdict is FAIL, re-run Step 4 with re-work prompt, then re-run Step 5. Max 2 retries.
 
-Step 6 (Compound): template compound.md, --max-turns 50
+Step 6 (Compound): Fix P1/P2 issues, then use /workflows:compound for learnings. template compound.md, --max-turns 50
 Verify: ${scopeDir}/compound-learnings.md exists, typecheck passes.
 
-Step 7 (Agent Ready): template agent-ready.md, --max-turns 20
+Step 7 (Agent Ready): Create PR, ClickUp task, dev briefing. template agent-ready.md, --max-turns 20
 Verify: ${scopeDir}/agent-ready.md exists, PR URL is in file.
 
 For each step, substitute these variables in the template:

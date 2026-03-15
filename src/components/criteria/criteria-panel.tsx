@@ -64,6 +64,7 @@ export function CriteriaPanel() {
     return 'jake'
   })
   const [filter, setFilter] = useState<FilterMode>('all')
+  const [search, setSearch] = useState('')
   const [showChangelog, setShowChangelog] = useState(false)
   const [changelog, setChangelog] = useState<ChangelogEntry[]>([])
 
@@ -239,7 +240,7 @@ export function CriteriaPanel() {
           </div>
         </div>
         <CriteriaStatsBar phases={phases} />
-        <CriteriaFilterBar filter={filter} onFilterChange={setFilter} />
+        <CriteriaFilterBar filter={filter} onFilterChange={setFilter} search={search} onSearchChange={setSearch} />
       </div>
 
       <div className="flex-1 overflow-hidden flex">
@@ -247,6 +248,7 @@ export function CriteriaPanel() {
           <CriteriaTable
             phases={phases}
             filter={filter}
+            search={search}
             activeUser={activeUser}
             onUpdate={handleUpdate}
             onBatchUpdate={handleBatchUpdate}

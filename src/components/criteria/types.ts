@@ -1,5 +1,6 @@
 export interface CriterionData {
   key: string
+  criterionId: string // e.g. "P1.S3.C05" — hierarchical searchable ID
   text: string
   hasVerifiedBy: boolean
   verifiedBy: string | null

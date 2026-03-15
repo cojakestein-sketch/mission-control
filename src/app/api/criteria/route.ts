@@ -79,13 +79,20 @@ export async function GET() {
             categoryMap.set(c.category, arr)
           }
 
+          // Generate sequential criterion IDs across all categories in this scope
+          const phaseNum = phase.replace('p', '')
+          const scopeNum = idx + 1
+          let criterionSeq = 0
+
           const categories = Array.from(categoryMap.entries()).map(
             ([name, criteria]) => ({
               name,
               criteria: criteria.map(c => {
+                criterionSeq++
                 const overlay = overlayMap.get(c.key)
                 return {
                   key: c.key,
+                  criterionId: `P${phaseNum}.S${scopeNum}.C${String(criterionSeq).padStart(2, '0')}`,
                   text: c.text,
                   hasVerifiedBy: c.hasVerifiedBy,
                   verifiedBy: c.verifiedBy || null,

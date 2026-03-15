@@ -622,11 +622,14 @@ function CopyPromptButton({ color, label, prompt }: { color: 'purple' | 'blue' |
 }
 
 function buildSpecPrompt(scopeName: string, scopeId: string, specPath: string): string {
+  // Extract phase number from scopeId (e.g., "p1-travel-dna" -> "1")
+  const phaseNum = scopeId.match(/^p(\d+)/)?.[1] || '?'
+
   return `You're starting the scope pipeline for "${scopeName}" (${scopeId}).
 
 Run /spec to interview me about this scope. I'll describe what I want and you'll write a structured spec with:
 - **Intent**: Why this scope exists (2-3 sentences)
-- **Acceptance Criteria**: Checkboxes for what "done" looks like
+- **Success Criteria**: Every criterion gets a unique ID using the format \`P${phaseNum}.S?.C{nn}\` (phase.scope.criterion — scope number will be assigned by the tracker). Number sequentially across all categories. Each criterion must have a "Verified by:" test script. Follow \`docs/frameworks/spec-criteria-framework.md\` for format rules, banned words, and testability checklist.
 - **Constraints**: Any technical or timeline constraints
 
 When the spec is complete:
@@ -636,7 +639,7 @@ When the spec is complete:
      -H "Content-Type: application/json" \\
      -d "$(jq -n --arg content "$(cat ${specPath})" --arg status ready --arg specPath "${specPath}" '{status: $status, content: $content, meta: {specPath: $specPath}}')"
 
-Then AUTOMATICALLY generate the FRD (Step 2) from the spec — expand my intent into detailed functional requirements: every screen, field, edge case, and API contract. Save the FRD into Mission Control's FRD pipeline section (see FRD prompt instructions).
+Then AUTOMATICALLY generate the FRD (Step 2) from the spec — expand my intent into detailed functional requirements: every screen, field, edge case, and API contract. Preserve all criterion IDs from the spec verbatim. Save the FRD into Mission Control's FRD pipeline section (see FRD prompt instructions).
 
 Let's go — start the interview.`
 }
@@ -651,7 +654,7 @@ Expand the spec into a detailed Functional Requirements Document:
 - Edge cases and error states
 - API contracts (endpoints, payloads)
 - Data model changes needed
-- Acceptance test scenarios
+- Success criteria copied verbatim with their IDs (P{X}.S{Y}.C{nn}) preserved
 
 When the FRD is complete, save it to BOTH locations:
 1. Save to tryps-docs repo at \`${frdPath}\` (for GitHub reference)
@@ -714,6 +717,7 @@ Print: \`[pipeline] ✓ Step N: {name} complete\` or \`[pipeline] ✗ Step N: {n
 - Do NOT open files in Marked 2 during Steps 3-6. Only open agent-ready.md after Step 7.
 - Do NOT ask me anything. Run all steps autonomously.
 - Each agent prompt must include: "Do NOT open files with open -a. Write files only."
+- All success criteria use IDs in the format P{X}.S{Y}.C{nn}. Preserve these IDs in all artifacts (plan, review, PR body, Slack notifications).
 
 ## After Step 7
 

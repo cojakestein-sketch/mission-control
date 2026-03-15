@@ -650,51 +650,47 @@ function buildAutonomousPipelinePrompt(scopeName: string, scopeId: string, scope
   const scopeDir = `/Users/jakestein/tryps-docs/scopes/${scopePath}`
   const branch = `feat/${feature}`
 
-  return `Run the autonomous scope pipeline for "${scopeName}" (${scopeId}), Steps 3 through 7.
-
-Variables:
-- SCOPE_PATH="${scopePath}"
-- FEATURE="${feature}"
-- SCOPE_DIR="${scopeDir}"
-- BRANCH="${branch}"
-- WORKSTREAM_ID="${scopeId}"
+  return `Run the autonomous scope pipeline for "${scopeName}" (${scopeId}), Steps 3→7.
 
 The spec and FRD are already approved:
 - ${scopeDir}/spec.md
 - ${scopeDir}/frd.md
 
-For each step (3 through 7), run it as a separate \`claude -p\` session for context isolation.
-Use the prompt templates in \`_private/tools/vision/prompts/\`.
+## How to Run Each Step
 
-Step 3 (Plan): Use /workflows:plan with the FRD as input. template plan.md, --max-turns 30
-Verify: ${scopeDir}/plan.md exists and is >300 bytes.
+Each step MUST run as a separate \`claude -p\` session for context isolation. Use this exact command pattern for every step:
 
-Step 4 (Work): Use /workflows:work with the plan. template work.md, --max-turns 100
-Verify: branch ${branch} exists, ${scopeDir}/work.md exists, typecheck passed.
+\`\`\`bash
+claude -p "$(sed 's|{{FEATURE}}|${feature}|g; s|{{SCOPE_DIR}}|${scopeDir}|g; s|{{BRANCH}}|${branch}|g; s|{{WORKSTREAM_ID}}|${scopeId}|g' _private/tools/vision/prompts/{TEMPLATE})" --add-dir "${scopeDir}" --max-turns {N} --output-format text 2>&1 | tee "${scopeDir}/{step}-output.log"
+\`\`\`
 
-Step 5 (Review): Use /workflows:review for code quality, PLUS verify spec criteria. template review.md, --max-turns 40
-Verify: ${scopeDir}/review.md exists.
-If verdict is FAIL, re-run Step 4 with re-work prompt, then re-run Step 5. Max 2 retries.
+CRITICAL: \`--add-dir "${scopeDir}"\` is REQUIRED. Without it the child session cannot read/write scope docs.
 
-Step 6 (Compound): Fix P1/P2 issues, then use /workflows:compound for learnings. template compound.md, --max-turns 50
-Verify: ${scopeDir}/compound-learnings.md exists, typecheck passes.
+## Steps (run in order)
 
-Step 7 (Agent Ready): Create PR, ClickUp task, dev briefing. template agent-ready.md, --max-turns 20
-Verify: ${scopeDir}/agent-ready.md exists, PR URL is in file.
+| # | Template | Max Turns | Output | Verify |
+|---|----------|-----------|--------|--------|
+| 3 | plan.md | 30 | ${scopeDir}/plan.md | >300 bytes |
+| 4 | work.md | 100 | ${scopeDir}/work-log.md + code on \`${branch}\` | Branch exists, typecheck passes |
+| 5 | review.md | 40 | ${scopeDir}/review.md | File exists |
+| 6 | compound.md | 50 | ${scopeDir}/compound-log.md | File exists, typecheck passes |
+| 7 | agent-ready.md | 20 | ${scopeDir}/agent-ready.md | PR URL in file |
 
-For each step, substitute these variables in the template:
-- {{FEATURE}} → ${feature}
-- {{SCOPE_DIR}} → ${scopeDir}
-- {{BRANCH}} → ${branch}
-- {{WORKSTREAM_ID}} → ${scopeId}
+If Step 5 review verdict is FAIL, re-run Steps 4→5. Max 2 retries.
 
-After each step, update Mission Control:
-curl -s -X PATCH -H "Authorization: Bearer $(cat ~/.mission-control-api-key)" -H "Content-Type: application/json" "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/{step_key}" -d '{"status": "{status}", "content": "..."}'
+## After Each Step
 
-After each step print: [pipeline] ✓ Step N: {name} complete
-If failed: [pipeline] ✗ Step N: {name} FAILED — print last 20 lines of log, stop.
+1. Verify the output file exists and meets the size/content check
+2. Update Mission Control:
+\`\`\`bash
+curl -s -X PATCH -H "Authorization: Bearer $(cat ~/.mission-control-api-key)" -H "Content-Type: application/json" "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/{step_key}" -d '{"status": "complete"}'
+\`\`\`
+3. Print: [pipeline] ✓ Step N: {name} complete
+4. If failed: [pipeline] ✗ Step N: {name} FAILED — print last 20 lines of log, stop.
 
-After Step 7, print the final report with all artifact paths and PR URL.
+## After Step 7
+
+Print the final report with all artifact paths and PR URL.
 Open ${scopeDir}/agent-ready.md in Marked 2.
 
 Do NOT ask me anything. Run all steps autonomously.`

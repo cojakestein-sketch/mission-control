@@ -629,7 +629,7 @@ function buildSpecPrompt(scopeName: string, scopeId: string, specPath: string): 
 
 Run /spec to interview me about this scope. I'll describe what I want and you'll write a structured spec with:
 - **Intent**: Why this scope exists (2-3 sentences)
-- **Success Criteria**: Every criterion gets a unique ID using the format \`P${phaseNum}.S?.C{nn}\` (phase.scope.criterion — scope number will be assigned by the tracker). Number sequentially across all categories. Each criterion must have a "Verified by:" test script. Follow \`docs/frameworks/spec-criteria-framework.md\` for format rules, banned words, and testability checklist.
+- **Success Criteria**: Every criterion gets a unique ID using the format \`P${phaseNum}.S?.C{nn}\` (phase.scope.criterion — scope number will be assigned by the tracker). Number sequentially across all categories. Each criterion must have a "Verified by:" test script. Follow \`docs/frameworks/spec-criteria-framework.md\` for format rules, banned words, and testability checklist. **Zero Context Clarity Check: every criterion must be understandable by a tester or developer who was NOT in this interview. No internal names, no component names — describe what the user sees. "Verified by:" must be a test anyone can run with the app open.**
 - **Constraints**: Any technical or timeline constraints
 
 When the spec is complete:

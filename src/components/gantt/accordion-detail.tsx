@@ -664,7 +664,10 @@ Each step MUST run as a separate \`claude -p\` session for context isolation. Us
 claude -p "$(sed 's|{{FEATURE}}|${feature}|g; s|{{SCOPE_DIR}}|${scopeDir}|g; s|{{BRANCH}}|${branch}|g; s|{{WORKSTREAM_ID}}|${scopeId}|g' _private/tools/vision/prompts/{TEMPLATE})" --add-dir "${scopeDir}" --max-turns {N} --output-format text 2>&1 | tee "${scopeDir}/{step}-output.log"
 \`\`\`
 
-CRITICAL: \`--add-dir "${scopeDir}"\` is REQUIRED. Without it the child session cannot read/write scope docs.
+CRITICAL:
+- \`--add-dir "${scopeDir}"\` is REQUIRED — without it the child session cannot read/write scope docs.
+- Set Bash timeout to 600000 (10 min) for each \`claude -p\` call. Steps 4 (Work) and 6 (Compound) may need up to 10 minutes.
+- Do NOT read the templates yourself — \`sed\` handles substitution. Just run the command.
 
 ## Steps (run in order)
 

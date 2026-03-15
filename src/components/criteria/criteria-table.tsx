@@ -12,7 +12,7 @@ interface Props {
   filter: FilterMode
   activeUser: string
   onUpdate: (key: string, update: { assignee?: string; qaStatus?: string; notes?: string }) => void
-  onBatchUpdate: (keys: string[], update: { assignee?: string; qaStatus?: string }) => void
+  onBatchUpdate?: (keys: string[], update: { assignee?: string; qaStatus?: string }) => void
 }
 
 function matchesFilter(c: CriterionData, filter: FilterMode, activeUser: string): boolean {
@@ -73,7 +73,6 @@ export function CriteriaTable({ phases, filter, activeUser, onUpdate, onBatchUpd
               onToggleScope={(key: string) => toggleSet(setExpandedScopes, key)}
               onToggleCategory={(key: string) => toggleSet(setExpandedCategories, key)}
               onUpdate={onUpdate}
-              onBatchUpdate={onBatchUpdate}
             />
           ))}
         </tbody>
@@ -95,13 +94,12 @@ interface PhaseRowsProps {
   onToggleScope: (key: string) => void
   onToggleCategory: (key: string) => void
   onUpdate: Props['onUpdate']
-  onBatchUpdate: Props['onBatchUpdate']
 }
 
 function PhaseRows({
   phase, filter, activeUser, expanded,
   expandedScopes, expandedCategories,
-  onTogglePhase, onToggleScope, onToggleCategory, onUpdate, onBatchUpdate,
+  onTogglePhase, onToggleScope, onToggleCategory, onUpdate,
 }: PhaseRowsProps) {
   const pct = phase.stats.total > 0
     ? Math.round((phase.stats.pass / phase.stats.total) * 100)
@@ -156,7 +154,6 @@ function PhaseRows({
                 onToggleScope={() => onToggleScope(scopeKey)}
                 onToggleCategory={onToggleCategory}
                 onUpdate={onUpdate}
-                onBatchUpdate={onBatchUpdate}
               />
             )
           })}
@@ -176,12 +173,11 @@ interface ScopeRowsProps {
   onToggleScope: () => void
   onToggleCategory: (key: string) => void
   onUpdate: Props['onUpdate']
-  onBatchUpdate: Props['onBatchUpdate']
 }
 
 function ScopeRows({
   scope, phase, filter, activeUser, expanded,
-  expandedCategories, onToggleScope, onToggleCategory, onUpdate, onBatchUpdate,
+  expandedCategories, onToggleScope, onToggleCategory, onUpdate,
 }: ScopeRowsProps) {
   if (scope.criteriaStatus !== 'populated') {
     return (
@@ -244,7 +240,6 @@ function ScopeRows({
                 expanded={expandedCategories.has(catKey)}
                 onToggle={() => onToggleCategory(catKey)}
                 onUpdate={onUpdate}
-                onBatchUpdate={onBatchUpdate}
               />
             )
           })}
@@ -261,41 +256,12 @@ interface CategoryRowsProps {
   expanded: boolean
   onToggle: () => void
   onUpdate: Props['onUpdate']
-  onBatchUpdate: Props['onBatchUpdate']
 }
 
-function CategoryRows({ category, filter, activeUser, expanded, onToggle, onUpdate, onBatchUpdate }: CategoryRowsProps) {
+function CategoryRows({ category, filter, activeUser, expanded, onToggle, onUpdate }: CategoryRowsProps) {
   const visibleCriteria = category.criteria.filter(c => matchesFilter(c, filter, activeUser))
   const passCount = category.criteria.filter(c => c.qaStatus === 'pass').length
   const totalCount = category.criteria.length
-
-  // Cascade: determine common assignee for display
-  const assignees = category.criteria.map(c => c.assignee).filter(Boolean)
-  const uniqueAssignees = new Set(assignees)
-  const commonAssignee = uniqueAssignees.size === 1 ? assignees[0] : ''
-
-  // Cascade: determine dominant QA status for display
-  const qaStatuses = category.criteria.map(c => c.qaStatus)
-  const uniqueQa = new Set(qaStatuses)
-  const commonQa = uniqueQa.size === 1 ? qaStatuses[0] : null
-
-  const handleCascadeAssignee = (value: string) => {
-    const keysToUpdate = category.criteria
-      .filter(c => !c.assignee)
-      .map(c => c.key)
-    if (keysToUpdate.length > 0) {
-      onBatchUpdate(keysToUpdate, { assignee: value })
-    }
-  }
-
-  const handleCascadeQa = (status: QaStatus) => {
-    const keysToUpdate = category.criteria
-      .filter(c => c.qaStatus === 'untested')
-      .map(c => c.key)
-    if (keysToUpdate.length > 0) {
-      onBatchUpdate(keysToUpdate, { qaStatus: status })
-    }
-  }
 
   return (
     <>
@@ -303,7 +269,7 @@ function CategoryRows({ category, filter, activeUser, expanded, onToggle, onUpda
         className="cursor-pointer group"
         onClick={onToggle}
       >
-        <td className="pl-16 pr-4 py-2 bg-gray-50/80 rounded-l-lg border-l-2 border-gray-200">
+        <td className="pl-16 pr-4 py-2 bg-gray-50/80 rounded-l-lg border-l-2 border-gray-200" colSpan={3}>
           <div className="flex items-center gap-2">
             <span className="text-gray-400 text-[10px] transition-transform duration-150" style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
               ▶
@@ -313,27 +279,6 @@ function CategoryRows({ category, filter, activeUser, expanded, onToggle, onUpda
               {passCount}/{totalCount}
             </span>
           </div>
-        </td>
-        <td className="px-4 py-2 bg-gray-50/80" onClick={e => e.stopPropagation()}>
-          <select
-            value={commonAssignee || ''}
-            onChange={e => handleCascadeAssignee(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white text-gray-600 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500/20"
-          >
-            <option value="">
-              {uniqueAssignees.size > 1 ? 'Mixed...' : '—'}
-            </option>
-            {ASSIGNEE_OPTIONS.filter(a => a.value).map(a => (
-              <option key={a.value} value={a.value}>{a.label}</option>
-            ))}
-          </select>
-        </td>
-        <td className="px-4 py-2 bg-gray-50/80 rounded-r-lg" onClick={e => e.stopPropagation()}>
-          <QaStatusChips
-            value={commonQa}
-            onChange={handleCascadeQa}
-            showLabels
-          />
         </td>
       </tr>
       {expanded &&
@@ -401,11 +346,9 @@ function CriterionRow({ criterion, activeUser, onUpdate }: CriterionRowProps) {
 function QaStatusChips({
   value,
   onChange,
-  showLabels,
 }: {
-  value: QaStatus | null
+  value: QaStatus
   onChange: (status: QaStatus) => void
-  showLabels?: boolean
 }) {
   return (
     <div className="inline-flex items-center gap-0.5 bg-gray-100/80 rounded-full p-0.5">
@@ -418,17 +361,15 @@ function QaStatusChips({
             onClick={(e) => { e.stopPropagation(); onChange(status) }}
             title={cfg.label}
             className={`
-              rounded-full flex items-center justify-center text-xs font-medium
+              w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium
               transition-all duration-150
-              ${showLabels ? 'px-2.5 py-1 gap-1' : 'w-7 h-7'}
               ${isActive
                 ? `${cfg.bg} ${cfg.text} shadow-sm`
                 : 'text-gray-300 hover:text-gray-500 hover:bg-white/60'
               }
             `}
           >
-            <span>{cfg.icon}</span>
-            {showLabels && isActive && <span className="text-[10px]">{cfg.label}</span>}
+            {cfg.icon}
           </button>
         )
       })}

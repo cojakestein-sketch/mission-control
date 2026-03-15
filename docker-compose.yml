@@ -19,6 +19,8 @@ services:
       - /home/openclaw/.openclaw/workspace-marty:/app/.openclaw/workspace-marty:ro
       - /home/openclaw/.openclaw/memory:/app/.openclaw/memory:ro
       - /home/openclaw/.openclaw/cron:/app/.openclaw/cron:ro
+      # Tryps scope specs for criteria tracker
+      - /home/openclaw/tryps-docs/scopes:/app/tryps-docs/scopes:ro
     read_only: true
     tmpfs:
       - /tmp

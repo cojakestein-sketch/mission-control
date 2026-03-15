@@ -38,6 +38,7 @@ import { ExecApprovalPanel } from '@/components/panels/exec-approval-panel'
 import { ChatPagePanel } from '@/components/panels/chat-page-panel'
 import { ChatPanel } from '@/components/chat/chat-panel'
 import { GanttPanel } from '@/components/panels/gantt-panel'
+import { CriteriaPanel } from '@/components/criteria/criteria-panel'
 import { TeamPanel } from '@/components/panels/team-panel'
 // TrypsOfficePanel removed — Virtual Office killed in v3 rebrand
 import { getPluginPanel } from '@/lib/plugins'
@@ -552,6 +553,8 @@ function ContentRouter({ tab }: { tab: string }) {
       return <ChatPagePanel />
     case 'gantt':
       return <GanttPanel />
+    case 'criteria':
+      return <CriteriaPanel />
     case 'tryps-team':
       return <TeamPanel />
     case 'tryps-office':

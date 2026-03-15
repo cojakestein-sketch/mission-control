@@ -2017,6 +2017,34 @@ const migrations: Migration[] = [
       update.run('2026-03-26', '2026-03-31', now, 'p5-friends-family')    // 1.
       update.run('2026-03-28', deadline, now, 'p5-strangers-review')      // 2.
     }
+  },
+  {
+    id: '052_criteria_overlay',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS criteria_overlay (
+          criterion_key TEXT PRIMARY KEY,
+          assignee TEXT,
+          qa_status TEXT DEFAULT 'untested' CHECK(qa_status IN ('untested', 'pass', 'fail', 'blocked')),
+          notes TEXT,
+          updated_by TEXT,
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS criteria_changelog (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          criterion_key TEXT NOT NULL,
+          field TEXT NOT NULL,
+          old_value TEXT,
+          new_value TEXT,
+          changed_by TEXT NOT NULL,
+          changed_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_changelog_key ON criteria_changelog(criterion_key);
+        CREATE INDEX IF NOT EXISTS idx_changelog_time ON criteria_changelog(changed_at DESC);
+      `)
+    }
   }
 ]
 

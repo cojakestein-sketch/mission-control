@@ -665,11 +665,12 @@ Each step MUST run as a separate \`claude -p\` session for context isolation. Fo
 
 \`\`\`bash
 sed 's|{{FEATURE}}|${feature}|g; s|{{SCOPE_DIR}}|${scopeDir}|g; s|{{BRANCH}}|${branch}|g; s|{{WORKSTREAM_ID}}|${scopeId}|g' _private/tools/vision/prompts/{TEMPLATE} > /tmp/pipeline-prompt.txt
-claude -p "$(cat /tmp/pipeline-prompt.txt)" --add-dir /Users/jakestein/tryps-docs --max-turns {N}
+claude -p "$(cat /tmp/pipeline-prompt.txt)" --add-dir /Users/jakestein/tryps-docs --max-turns {N} --permission-mode bypassPermissions
 \`\`\`
 
 CRITICAL:
 - \`--add-dir /Users/jakestein/tryps-docs\` is REQUIRED — without it the child session cannot read/write scope docs.
+- \`--permission-mode bypassPermissions\` is REQUIRED — \`claude -p\` is non-interactive and cannot prompt for file write permissions.
 - Do NOT use \`--output-format text\` — it causes the subprocess to buffer all output and appear frozen.
 - Do NOT pipe through \`tee\` — it can cause hangs.
 - Set Bash timeout to 600000 (10 min) for each \`claude -p\` call.

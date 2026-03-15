@@ -668,6 +668,7 @@ CRITICAL:
 - \`--add-dir "${scopeDir}"\` is REQUIRED — without it the child session cannot read/write scope docs.
 - Set Bash timeout to 600000 (10 min) for each \`claude -p\` call. Steps 4 (Work) and 6 (Compound) may need up to 10 minutes.
 - Do NOT read the templates yourself — \`sed\` handles substitution. Just run the command.
+- Do NOT open files in Marked 2 or any other app during Steps 3-6. Only open agent-ready.md after Step 7 completes.
 
 ## Steps (run in order)
 

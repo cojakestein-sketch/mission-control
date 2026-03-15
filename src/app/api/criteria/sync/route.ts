@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { execSync } from 'child_process'
-import { existsSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { config } from '@/lib/config'
 import { getDatabase } from '@/lib/db'
@@ -90,6 +90,29 @@ export async function POST() {
       created.push(`${scope.phase}/${scope.scope} → workstream ${wsId}`)
     }
 
+    // Sync disk specs → Gantt pipeline DB (spec_content)
+    // This ensures the Gantt pipeline view stays aligned with what's on disk
+    const specsSynced: string[] = []
+    for (const scope of scopes) {
+      if (scope.criteriaStatus !== 'populated') continue
+      const wsId = `${scope.phase}-${scope.scope}`
+      if (!wsIds.has(wsId) && !created.some(c => c.includes(wsId))) continue
+
+      const specPath = join(config.specsDir, scope.phase, scope.scope, 'spec.md')
+      try {
+        const content = readFileSync(specPath, 'utf-8')
+        const relPath = `scopes/${scope.phase}/${scope.scope}/spec.md`
+        const existing = db.prepare('SELECT spec_content FROM workstreams WHERE id = ?').get(wsId) as { spec_content: string | null } | undefined
+        // Only update if content changed or was empty
+        if (!existing?.spec_content || existing.spec_content.length < content.length * 0.5) {
+          db.prepare(
+            'UPDATE workstreams SET spec_content = ?, spec_path = COALESCE(spec_path, ?), updated_at = ? WHERE id = ?'
+          ).run(content, relPath, new Date().toISOString(), wsId)
+          specsSynced.push(wsId)
+        }
+      } catch { /* skip unreadable files */ }
+    }
+
     // Check for workstreams without spec files
     for (const ws of workstreams) {
       const phase = ws.parent_id?.replace(/-.*$/, '') || ''
@@ -103,6 +126,7 @@ export async function POST() {
     return NextResponse.json({
       synced: true,
       created,
+      specsSynced,
       warnings,
       totalScopes: scopes.length,
       totalWorkstreams: wsIds.size + created.length,

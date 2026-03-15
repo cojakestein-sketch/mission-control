@@ -1,11 +1,22 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import type { PhaseData, ScopeData, CategoryData, CriterionData, FilterMode } from './types'
 import { ASSIGNEE_OPTIONS, QA_STATUS_CONFIG } from './types'
 import type { QaStatus } from './types'
 
 const QA_STATUSES: QaStatus[] = ['untested', 'pass', 'fail', 'blocked']
+
+interface AddParams {
+  type: 'criterion' | 'category' | 'scope'
+  phase?: string
+  scope?: string
+  category?: string
+  text?: string
+  scopeSlug?: string
+  scopeLabel?: string
+  categoryName?: string
+}
 
 interface Props {
   phases: PhaseData[]
@@ -13,6 +24,7 @@ interface Props {
   activeUser: string
   onUpdate: (key: string, update: { assignee?: string; qaStatus?: string; notes?: string }) => void
   onBatchUpdate?: (keys: string[], update: { assignee?: string; qaStatus?: string }) => void
+  onAdd?: (params: AddParams) => Promise<void>
 }
 
 function matchesFilter(c: CriterionData, filter: FilterMode, activeUser: string): boolean {
@@ -29,7 +41,7 @@ function scopeHasVisibleCriteria(scope: ScopeData, filter: FilterMode, activeUse
   return scope.categories.some(cat => categoryHasVisibleCriteria(cat, filter, activeUser))
 }
 
-export function CriteriaTable({ phases, filter, activeUser, onUpdate, onBatchUpdate }: Props) {
+export function CriteriaTable({ phases, filter, activeUser, onUpdate, onAdd }: Props) {
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(() => new Set(['p1']))
   const [expandedScopes, setExpandedScopes] = useState<Set<string>>(new Set())
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
@@ -73,11 +85,88 @@ export function CriteriaTable({ phases, filter, activeUser, onUpdate, onBatchUpd
               onToggleScope={(key: string) => toggleSet(setExpandedScopes, key)}
               onToggleCategory={(key: string) => toggleSet(setExpandedCategories, key)}
               onUpdate={onUpdate}
+              onAdd={onAdd}
             />
           ))}
         </tbody>
       </table>
     </div>
+  )
+}
+
+// ── Inline add input ─────────────────────────────────────────────────
+
+function InlineAddRow({
+  placeholder,
+  indent,
+  onSubmit,
+  onCancel,
+}: {
+  placeholder: string
+  indent: string
+  onSubmit: (text: string) => void
+  onCancel: () => void
+}) {
+  const [text, setText] = useState('')
+  const [saving, setSaving] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { inputRef.current?.focus() }, [])
+
+  const handleSubmit = () => {
+    if (!text.trim() || saving) return
+    setSaving(true)
+    onSubmit(text.trim())
+  }
+
+  return (
+    <tr>
+      <td className={`${indent} pr-4 py-1.5 bg-white rounded-l-lg`} colSpan={3}>
+        <div className="flex items-center gap-2">
+          <input
+            ref={inputRef}
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleSubmit()
+              if (e.key === 'Escape') onCancel()
+            }}
+            placeholder={placeholder}
+            disabled={saving}
+            className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-300 disabled:opacity-50"
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={!text.trim() || saving}
+            className="text-xs font-medium text-white bg-gray-900 px-2.5 py-1.5 rounded-lg hover:bg-gray-800 disabled:opacity-40 transition-colors"
+          >
+            {saving ? '...' : 'Add'}
+          </button>
+          <button
+            onClick={onCancel}
+            className="text-xs text-gray-400 hover:text-gray-600 px-1.5 py-1.5"
+          >
+            Cancel
+          </button>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+function AddButton({ label, indent, onClick }: { label: string; indent: string; onClick: () => void }) {
+  return (
+    <tr>
+      <td className={`${indent} pr-4 py-1`} colSpan={3}>
+        <button
+          onClick={onClick}
+          className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <span className="w-4 h-4 rounded-full border border-dashed border-gray-300 flex items-center justify-center text-[10px] hover:border-gray-400">+</span>
+          {label}
+        </button>
+      </td>
+    </tr>
   )
 }
 
@@ -94,13 +183,15 @@ interface PhaseRowsProps {
   onToggleScope: (key: string) => void
   onToggleCategory: (key: string) => void
   onUpdate: Props['onUpdate']
+  onAdd?: Props['onAdd']
 }
 
 function PhaseRows({
   phase, filter, activeUser, expanded,
   expandedScopes, expandedCategories,
-  onTogglePhase, onToggleScope, onToggleCategory, onUpdate,
+  onTogglePhase, onToggleScope, onToggleCategory, onUpdate, onAdd,
 }: PhaseRowsProps) {
+  const [addingScope, setAddingScope] = useState(false)
   const pct = phase.stats.total > 0
     ? Math.round((phase.stats.pass / phase.stats.total) * 100)
     : 0
@@ -137,26 +228,48 @@ function PhaseRows({
           </div>
         </td>
       </tr>
-      {expanded &&
-        phase.scopes
-          .filter(scope => filter === 'all' || scopeHasVisibleCriteria(scope, filter, activeUser))
-          .map(scope => {
-            const scopeKey = `${phase.phase}/${scope.scope}`
-            return (
-              <ScopeRows
-                key={scopeKey}
-                scope={scope}
-                phase={phase.phase}
-                filter={filter}
-                activeUser={activeUser}
-                expanded={expandedScopes.has(scopeKey)}
-                expandedCategories={expandedCategories}
-                onToggleScope={() => onToggleScope(scopeKey)}
-                onToggleCategory={onToggleCategory}
-                onUpdate={onUpdate}
-              />
-            )
-          })}
+      {expanded && (
+        <>
+          {phase.scopes
+            .filter(scope => filter === 'all' || scopeHasVisibleCriteria(scope, filter, activeUser))
+            .map(scope => {
+              const scopeKey = `${phase.phase}/${scope.scope}`
+              return (
+                <ScopeRows
+                  key={scopeKey}
+                  scope={scope}
+                  phase={phase.phase}
+                  filter={filter}
+                  activeUser={activeUser}
+                  expanded={expandedScopes.has(scopeKey)}
+                  expandedCategories={expandedCategories}
+                  onToggleScope={() => onToggleScope(scopeKey)}
+                  onToggleCategory={onToggleCategory}
+                  onUpdate={onUpdate}
+                  onAdd={onAdd}
+                />
+              )
+            })}
+          {onAdd && !addingScope && (
+            <AddButton
+              label="Add scope"
+              indent="pl-10"
+              onClick={() => setAddingScope(true)}
+            />
+          )}
+          {onAdd && addingScope && (
+            <InlineAddRow
+              placeholder="scope-slug (e.g. push-notifications)"
+              indent="pl-10"
+              onSubmit={(slug) => {
+                onAdd({ type: 'scope', phase: phase.phase, scopeSlug: slug })
+                setAddingScope(false)
+              }}
+              onCancel={() => setAddingScope(false)}
+            />
+          )}
+        </>
+      )}
     </>
   )
 }
@@ -173,12 +286,15 @@ interface ScopeRowsProps {
   onToggleScope: () => void
   onToggleCategory: (key: string) => void
   onUpdate: Props['onUpdate']
+  onAdd?: Props['onAdd']
 }
 
 function ScopeRows({
   scope, phase, filter, activeUser, expanded,
-  expandedCategories, onToggleScope, onToggleCategory, onUpdate,
+  expandedCategories, onToggleScope, onToggleCategory, onUpdate, onAdd,
 }: ScopeRowsProps) {
+  const [addingCategory, setAddingCategory] = useState(false)
+
   if (scope.criteriaStatus !== 'populated') {
     return (
       <tr>
@@ -226,23 +342,47 @@ function ScopeRows({
           </div>
         </td>
       </tr>
-      {expanded &&
-        scope.categories
-          .filter(cat => filter === 'all' || categoryHasVisibleCriteria(cat, filter, activeUser))
-          .map(cat => {
-            const catKey = `${phase}/${scope.scope}/${cat.name}`
-            return (
-              <CategoryRows
-                key={catKey}
-                category={cat}
-                filter={filter}
-                activeUser={activeUser}
-                expanded={expandedCategories.has(catKey)}
-                onToggle={() => onToggleCategory(catKey)}
-                onUpdate={onUpdate}
-              />
-            )
-          })}
+      {expanded && (
+        <>
+          {scope.categories
+            .filter(cat => filter === 'all' || categoryHasVisibleCriteria(cat, filter, activeUser))
+            .map(cat => {
+              const catKey = `${phase}/${scope.scope}/${cat.name}`
+              return (
+                <CategoryRows
+                  key={catKey}
+                  category={cat}
+                  phase={phase}
+                  scope={scope.scope}
+                  filter={filter}
+                  activeUser={activeUser}
+                  expanded={expandedCategories.has(catKey)}
+                  onToggle={() => onToggleCategory(catKey)}
+                  onUpdate={onUpdate}
+                  onAdd={onAdd}
+                />
+              )
+            })}
+          {onAdd && !addingCategory && (
+            <AddButton
+              label="Add category"
+              indent="pl-16"
+              onClick={() => setAddingCategory(true)}
+            />
+          )}
+          {onAdd && addingCategory && (
+            <InlineAddRow
+              placeholder="Category name (e.g. Error Handling)"
+              indent="pl-16"
+              onSubmit={(name) => {
+                onAdd({ type: 'category', phase, scope: scope.scope, categoryName: name })
+                setAddingCategory(false)
+              }}
+              onCancel={() => setAddingCategory(false)}
+            />
+          )}
+        </>
+      )}
     </>
   )
 }
@@ -251,14 +391,18 @@ function ScopeRows({
 
 interface CategoryRowsProps {
   category: CategoryData
+  phase: string
+  scope: string
   filter: FilterMode
   activeUser: string
   expanded: boolean
   onToggle: () => void
   onUpdate: Props['onUpdate']
+  onAdd?: Props['onAdd']
 }
 
-function CategoryRows({ category, filter, activeUser, expanded, onToggle, onUpdate }: CategoryRowsProps) {
+function CategoryRows({ category, phase, scope, filter, activeUser, expanded, onToggle, onUpdate, onAdd }: CategoryRowsProps) {
+  const [addingCriterion, setAddingCriterion] = useState(false)
   const visibleCriteria = category.criteria.filter(c => matchesFilter(c, filter, activeUser))
   const passCount = category.criteria.filter(c => c.qaStatus === 'pass').length
   const totalCount = category.criteria.length
@@ -281,15 +425,36 @@ function CategoryRows({ category, filter, activeUser, expanded, onToggle, onUpda
           </div>
         </td>
       </tr>
-      {expanded &&
-        visibleCriteria.map(criterion => (
-          <CriterionRow
-            key={criterion.key}
-            criterion={criterion}
-            activeUser={activeUser}
-            onUpdate={onUpdate}
-          />
-        ))}
+      {expanded && (
+        <>
+          {visibleCriteria.map(criterion => (
+            <CriterionRow
+              key={criterion.key}
+              criterion={criterion}
+              activeUser={activeUser}
+              onUpdate={onUpdate}
+            />
+          ))}
+          {onAdd && !addingCriterion && (
+            <AddButton
+              label="Add criterion"
+              indent="pl-20"
+              onClick={() => setAddingCriterion(true)}
+            />
+          )}
+          {onAdd && addingCriterion && (
+            <InlineAddRow
+              placeholder="Success criterion text..."
+              indent="pl-20"
+              onSubmit={(text) => {
+                onAdd({ type: 'criterion', phase, scope, category: category.name, text })
+                setAddingCriterion(false)
+              }}
+              onCancel={() => setAddingCriterion(false)}
+            />
+          )}
+        </>
+      )}
     </>
   )
 }

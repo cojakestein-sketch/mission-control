@@ -146,6 +146,36 @@ export function CriteriaPanel() {
     [activeUser, fetchCriteria, fetchChangelog]
   )
 
+  const handleAdd = useCallback(
+    async (params: {
+      type: 'criterion' | 'category' | 'scope'
+      phase?: string
+      scope?: string
+      category?: string
+      text?: string
+      scopeSlug?: string
+      scopeLabel?: string
+      categoryName?: string
+    }) => {
+      try {
+        const res = await fetch('/api/criteria/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params),
+        })
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || `HTTP ${res.status}`)
+        }
+        await fetchCriteria()
+      } catch (err) {
+        setError(String(err))
+        setTimeout(() => setError(null), 3000)
+      }
+    },
+    [fetchCriteria]
+  )
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-400">
@@ -198,6 +228,7 @@ export function CriteriaPanel() {
             activeUser={activeUser}
             onUpdate={handleUpdate}
             onBatchUpdate={handleBatchUpdate}
+            onAdd={handleAdd}
           />
         </div>
         {showChangelog && (

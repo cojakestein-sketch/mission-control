@@ -652,59 +652,56 @@ function buildAutonomousPipelinePrompt(scopeName: string, scopeId: string, scope
 
   return `Run the autonomous scope pipeline for "${scopeName}" (${scopeId}), Steps 3→7.
 
-The spec and FRD are already approved:
-- ${scopeDir}/spec.md
-- ${scopeDir}/frd.md
+## Variables
 
-## How to Run Each Step
+- FEATURE: ${feature}
+- SCOPE_DIR: ${scopeDir}
+- BRANCH: ${branch}
+- WORKSTREAM_ID: ${scopeId}
 
-Each step MUST run as a separate \`claude -p\` session for context isolation. For each step:
+## How It Works
 
-1. Write the substituted prompt to a temp file
-2. Run \`claude -p\` reading from that file
+Use the **Agent tool** to run each step. Each agent is a full Opus session with its own context.
 
-\`\`\`bash
-sed 's|{{FEATURE}}|${feature}|g; s|{{SCOPE_DIR}}|${scopeDir}|g; s|{{BRANCH}}|${branch}|g; s|{{WORKSTREAM_ID}}|${scopeId}|g' _private/tools/vision/prompts/{TEMPLATE} > /tmp/pipeline-prompt.txt
-claude -p "$(cat /tmp/pipeline-prompt.txt)" --add-dir /Users/jakestein/tryps-docs --max-turns {N} --permission-mode bypassPermissions
-\`\`\`
+For each step:
+1. **Check if output already exists** and passes verification — if yes, skip to the next step
+2. Read the template file from \`_private/tools/vision/prompts/{template}\`
+3. Replace all template variables: \`{{FEATURE}}\`, \`{{SCOPE_DIR}}\`, \`{{DIR}}\`, \`{{BRANCH}}\`, \`{{WORKSTREAM_ID}}\` with the values above (templates may use \`{{DIR}}\` or \`{{SCOPE_DIR}}\` — replace both with SCOPE_DIR value)
+4. Spawn an Agent with: \`model: "opus"\`, \`mode: "bypassPermissions"\`, the substituted template as the prompt
+5. Wait for the agent to complete
+6. Verify the output file exists
+7. Update Mission Control, print status, move to next step
 
-CRITICAL:
-- \`--add-dir /Users/jakestein/tryps-docs\` is REQUIRED — without it the child session cannot read/write scope docs.
-- \`--permission-mode bypassPermissions\` is REQUIRED — \`claude -p\` is non-interactive and cannot prompt for file write permissions.
-- Do NOT use \`--output-format text\` — it causes the subprocess to buffer all output and appear frozen.
-- Do NOT pipe through \`tee\` — it can cause hangs.
-- Set Bash timeout to 600000 (10 min) for each \`claude -p\` call.
-- Do NOT read the templates yourself — \`sed\` handles substitution. Just run the commands above.
-- Do NOT open files in Marked 2 or any other app during Steps 3-6. Only open agent-ready.md after Step 7 completes.
+## Steps
 
-## Steps (run in order)
+| # | Name | Template | Output | Skip If |
+|---|------|----------|--------|---------|
+| 3 | Plan | plan.md | ${scopeDir}/plan.md | Exists and >300 bytes |
+| 4 | Work | work.md | ${scopeDir}/work-log.md | Exists and branch \`${branch}\` exists |
+| 5 | Review | review.md | ${scopeDir}/review.md | Exists and not a placeholder |
+| 6 | Compound | compound.md | ${scopeDir}/compound-log.md | Exists and not a placeholder |
+| 7 | Agent Ready | agent-ready.md | ${scopeDir}/agent-ready.md | Contains a PR URL |
 
-| # | Template | Max Turns | Output | Verify |
-|---|----------|-----------|--------|--------|
-| 3 | plan.md | 30 | ${scopeDir}/plan.md | >300 bytes |
-| 4 | work.md | 100 | ${scopeDir}/work-log.md + code on \`${branch}\` | Branch exists, typecheck passes |
-| 5 | review.md | 40 | ${scopeDir}/review.md | File exists |
-| 6 | compound.md | 50 | ${scopeDir}/compound-log.md | File exists, typecheck passes |
-| 7 | agent-ready.md | 20 | ${scopeDir}/agent-ready.md | PR URL in file |
-
-If Step 5 review verdict is FAIL, re-run Steps 4→5. Max 2 retries.
+If Step 5 review says FAIL, re-run Steps 4→5. Max 2 retries.
 
 ## After Each Step
 
-1. Verify the output file exists and meets the size/content check
-2. Update Mission Control:
 \`\`\`bash
 curl -s -X PATCH -H "Authorization: Bearer $(cat ~/.mission-control-api-key)" -H "Content-Type: application/json" "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/{step_key}" -d '{"status": "complete"}'
 \`\`\`
-3. Print: [pipeline] ✓ Step N: {name} complete
-4. If failed: [pipeline] ✗ Step N: {name} FAILED — print last 20 lines of log, stop.
+
+Print: \`[pipeline] ✓ Step N: {name} complete\` or \`[pipeline] ✗ Step N: {name} FAILED\`
+
+## Rules
+
+- Do NOT open files in Marked 2 during Steps 3-6. Only open agent-ready.md after Step 7.
+- Do NOT ask me anything. Run all steps autonomously.
+- Each agent prompt must include: "Do NOT open files with open -a. Write files only."
 
 ## After Step 7
 
 Print the final report with all artifact paths and PR URL.
-Open ${scopeDir}/agent-ready.md in Marked 2.
-
-Do NOT ask me anything. Run all steps autonomously.`
+Open ${scopeDir}/agent-ready.md in Marked 2.`
 }
 
 // Very simple markdown to HTML (headers, bold, lists, code)

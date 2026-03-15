@@ -19,6 +19,7 @@ export interface CategoryData {
 export interface ScopeData {
   scope: string
   label: string
+  scopeIndex: number
   criteriaStatus: 'populated' | 'placeholder' | 'missing'
   stats: StatsData
   categories: CategoryData[]

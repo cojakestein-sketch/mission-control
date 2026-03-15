@@ -7,13 +7,13 @@ interface Props {
   onFilterChange: (filter: FilterMode) => void
 }
 
-const FILTERS: { value: FilterMode; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'untested', label: 'Untested' },
-  { value: 'pass', label: 'Pass' },
-  { value: 'fail', label: 'Fail' },
-  { value: 'blocked', label: 'Blocked' },
-  { value: 'mine', label: 'Mine' },
+const FILTERS: { value: FilterMode; label: string; icon: string }[] = [
+  { value: 'all', label: 'All', icon: '' },
+  { value: 'untested', label: 'Untested', icon: '○' },
+  { value: 'pass', label: 'Pass', icon: '✓' },
+  { value: 'fail', label: 'Fail', icon: '✗' },
+  { value: 'blocked', label: 'Blocked', icon: '■' },
+  { value: 'mine', label: 'Mine', icon: '' },
 ]
 
 export function CriteriaFilterBar({ filter, onFilterChange }: Props) {
@@ -23,12 +23,13 @@ export function CriteriaFilterBar({ filter, onFilterChange }: Props) {
         <button
           key={f.value}
           onClick={() => onFilterChange(f.value)}
-          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
             filter === f.value
-              ? 'bg-gray-900 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-gray-900 text-white shadow-sm'
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
           }`}
         >
+          {f.icon && <span className="mr-1">{f.icon}</span>}
           {f.label}
         </button>
       ))}

@@ -14,18 +14,14 @@ export function CriteriaIdentityBar({ activeUser, onUserChange }: Props) {
       <select
         value={activeUser}
         onChange={e => onUserChange(e.target.value)}
-        className="border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+        className="border border-gray-200 rounded-lg px-2.5 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400"
       >
-        <option value="">Select name...</option>
         {ASSIGNEE_OPTIONS.filter(a => a.value).map(a => (
           <option key={a.value} value={a.value}>
             {a.label}
           </option>
         ))}
       </select>
-      {!activeUser && (
-        <span className="text-amber-600 text-xs">Select your name to edit</span>
-      )}
     </div>
   )
 }

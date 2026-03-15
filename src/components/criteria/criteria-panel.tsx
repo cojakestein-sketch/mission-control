@@ -8,15 +8,60 @@ import { CriteriaTable } from './criteria-table'
 import { CriteriaChangelog } from './criteria-changelog'
 import type { PhaseData, FilterMode, ChangelogEntry } from './types'
 
+function calcStats(criteria: { qaStatus: string }[]) {
+  return {
+    total: criteria.length,
+    pass: criteria.filter(c => c.qaStatus === 'pass').length,
+    fail: criteria.filter(c => c.qaStatus === 'fail').length,
+    blocked: criteria.filter(c => c.qaStatus === 'blocked').length,
+    untested: criteria.filter(c => c.qaStatus === 'untested').length,
+  }
+}
+
+function applyUpdate(
+  phases: PhaseData[],
+  keys: Set<string>,
+  update: { assignee?: string; qaStatus?: string },
+  activeUser: string
+): PhaseData[] {
+  return phases.map(phase => {
+    const newScopes = phase.scopes.map(scope => {
+      const newCategories = scope.categories.map(cat => ({
+        ...cat,
+        criteria: cat.criteria.map(c => {
+          if (!keys.has(c.key)) return c
+          return {
+            ...c,
+            assignee: update.assignee !== undefined ? update.assignee : c.assignee,
+            qaStatus: (update.qaStatus as typeof c.qaStatus) || c.qaStatus,
+            updatedBy: activeUser,
+            updatedAt: new Date().toISOString(),
+          }
+        }),
+      }))
+      return {
+        ...scope,
+        categories: newCategories,
+        stats: calcStats(newCategories.flatMap(c => c.criteria)),
+      }
+    })
+    return {
+      ...phase,
+      scopes: newScopes,
+      stats: calcStats(newScopes.flatMap(s => s.categories.flatMap(c => c.criteria))),
+    }
+  })
+}
+
 export function CriteriaPanel() {
   const [phases, setPhases] = useState<PhaseData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeUser, setActiveUser] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('criteria-active-user') || ''
+      return localStorage.getItem('criteria-active-user') || 'jake'
     }
-    return ''
+    return 'jake'
   })
   const [filter, setFilter] = useState<FilterMode>('all')
   const [showChangelog, setShowChangelog] = useState(false)
@@ -66,75 +111,32 @@ export function CriteriaPanel() {
 
   const handleUpdate = useCallback(
     async (key: string, update: { assignee?: string; qaStatus?: string; notes?: string }) => {
-      if (!activeUser) return
-
-      // Optimistic update
-      setPhases(prev =>
-        prev.map(phase => ({
-          ...phase,
-          scopes: phase.scopes.map(scope => ({
-            ...scope,
-            categories: scope.categories.map(cat => ({
-              ...cat,
-              criteria: cat.criteria.map(c => {
-                if (c.key !== key) return c
-                return {
-                  ...c,
-                  assignee: update.assignee !== undefined ? update.assignee : c.assignee,
-                  qaStatus: (update.qaStatus as typeof c.qaStatus) || c.qaStatus,
-                  notes: update.notes !== undefined ? update.notes : c.notes,
-                  updatedBy: activeUser,
-                  updatedAt: new Date().toISOString(),
-                }
-              }),
-            })),
-            stats: (() => {
-              const allCriteria = scope.categories.flatMap(cat =>
-                cat.criteria.map(c => {
-                  if (c.key !== key) return c
-                  return {
-                    ...c,
-                    qaStatus: (update.qaStatus as typeof c.qaStatus) || c.qaStatus,
-                  }
-                })
-              )
-              return {
-                total: allCriteria.length,
-                pass: allCriteria.filter(c => c.qaStatus === 'pass').length,
-                fail: allCriteria.filter(c => c.qaStatus === 'fail').length,
-                blocked: allCriteria.filter(c => c.qaStatus === 'blocked').length,
-                untested: allCriteria.filter(c => c.qaStatus === 'untested').length,
-              }
-            })(),
-          })),
-          stats: (() => {
-            const allCriteria = phase.scopes.flatMap(scope =>
-              scope.categories.flatMap(cat =>
-                cat.criteria.map(c => {
-                  if (c.key !== key) return c
-                  return {
-                    ...c,
-                    qaStatus: (update.qaStatus as typeof c.qaStatus) || c.qaStatus,
-                  }
-                })
-              )
-            )
-            return {
-              total: allCriteria.length,
-              pass: allCriteria.filter(c => c.qaStatus === 'pass').length,
-              fail: allCriteria.filter(c => c.qaStatus === 'fail').length,
-              blocked: allCriteria.filter(c => c.qaStatus === 'blocked').length,
-              untested: allCriteria.filter(c => c.qaStatus === 'untested').length,
-            }
-          })(),
-        }))
-      )
+      setPhases(prev => applyUpdate(prev, new Set([key]), update, activeUser))
 
       try {
         await fetch(`/api/criteria/${encodeURIComponent(key)}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...update, updatedBy: activeUser }),
+        })
+        fetchChangelog()
+      } catch {
+        fetchCriteria()
+      }
+    },
+    [activeUser, fetchCriteria, fetchChangelog]
+  )
+
+  const handleBatchUpdate = useCallback(
+    async (keys: string[], update: { assignee?: string; qaStatus?: string }) => {
+      if (keys.length === 0) return
+      setPhases(prev => applyUpdate(prev, new Set(keys), update, activeUser))
+
+      try {
+        await fetch('/api/criteria/batch', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keys, ...update, updatedBy: activeUser }),
         })
         fetchChangelog()
       } catch {
@@ -163,15 +165,22 @@ export function CriteriaPanel() {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="shrink-0 border-b border-gray-200 bg-white px-6 py-4">
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-semibold text-gray-900">Success Criteria Tracker</h1>
+    <div className="h-full flex flex-col overflow-hidden bg-[#f5f7fa]">
+      <div className="shrink-0 bg-white border-b border-gray-200 px-6 pt-5 pb-4">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Success Criteria Tracker</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Track verification progress across all scopes</p>
+          </div>
           <div className="flex items-center gap-3">
             <CriteriaIdentityBar activeUser={activeUser} onUserChange={handleUserChange} />
             <button
               onClick={() => setShowChangelog(!showChangelog)}
-              className="text-sm text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
+              className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                showChangelog
+                  ? 'bg-gray-900 text-white'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+              }`}
             >
               History
             </button>
@@ -188,10 +197,11 @@ export function CriteriaPanel() {
             filter={filter}
             activeUser={activeUser}
             onUpdate={handleUpdate}
+            onBatchUpdate={handleBatchUpdate}
           />
         </div>
         {showChangelog && (
-          <div className="w-72 shrink-0 overflow-auto bg-gray-50 p-4">
+          <div className="w-80 shrink-0 overflow-auto bg-white p-5 border-l border-gray-100">
             <CriteriaChangelog changes={changelog} />
           </div>
         )}

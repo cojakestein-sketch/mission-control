@@ -40,7 +40,7 @@ export async function GET() {
     const phases = Array.from(phaseMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([phase, phaseScopes]) => {
-        const scopeResults = phaseScopes.map(scope => {
+        const scopeResults = phaseScopes.map((scope, idx) => {
           // Group criteria by category
           const categoryMap = new Map<string, typeof scope.criteria>()
           for (const c of scope.criteria) {
@@ -82,6 +82,7 @@ export async function GET() {
           return {
             scope: scope.scope,
             label: scope.scopeLabel,
+            scopeIndex: idx + 1,
             criteriaStatus: scope.criteriaStatus,
             stats,
             categories,

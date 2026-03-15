@@ -5,11 +5,14 @@ import type { PhaseData, ScopeData, CategoryData, CriterionData, FilterMode } fr
 import { ASSIGNEE_OPTIONS, QA_STATUS_CONFIG } from './types'
 import type { QaStatus } from './types'
 
+const QA_STATUSES: QaStatus[] = ['untested', 'pass', 'fail', 'blocked']
+
 interface Props {
   phases: PhaseData[]
   filter: FilterMode
   activeUser: string
   onUpdate: (key: string, update: { assignee?: string; qaStatus?: string; notes?: string }) => void
+  onBatchUpdate: (keys: string[], update: { assignee?: string; qaStatus?: string }) => void
 }
 
 function matchesFilter(c: CriterionData, filter: FilterMode, activeUser: string): boolean {
@@ -26,7 +29,7 @@ function scopeHasVisibleCriteria(scope: ScopeData, filter: FilterMode, activeUse
   return scope.categories.some(cat => categoryHasVisibleCriteria(cat, filter, activeUser))
 }
 
-export function CriteriaTable({ phases, filter, activeUser, onUpdate }: Props) {
+export function CriteriaTable({ phases, filter, activeUser, onUpdate, onBatchUpdate }: Props) {
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(() => new Set(['p1']))
   const [expandedScopes, setExpandedScopes] = useState<Set<string>>(new Set())
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
@@ -41,34 +44,41 @@ export function CriteriaTable({ phases, filter, activeUser, onUpdate }: Props) {
   }, [])
 
   return (
-    <table className="w-full text-sm">
-      <thead className="sticky top-0 bg-white z-10 border-b border-gray-200">
-        <tr>
-          <th className="text-left px-4 py-2 w-20 text-gray-500 font-medium">Phase</th>
-          <th className="text-left px-4 py-2 w-40 text-gray-500 font-medium">Scope</th>
-          <th className="text-left px-4 py-2 text-gray-500 font-medium">Success Criteria</th>
-          <th className="text-left px-4 py-2 w-28 text-gray-500 font-medium">Assigned</th>
-          <th className="text-left px-4 py-2 w-24 text-gray-500 font-medium">QA</th>
-        </tr>
-      </thead>
-      <tbody>
-        {phases.map(phase => (
-          <PhaseRows
-            key={phase.phase}
-            phase={phase}
-            filter={filter}
-            activeUser={activeUser}
-            expanded={expandedPhases.has(phase.phase)}
-            expandedScopes={expandedScopes}
-            expandedCategories={expandedCategories}
-            onTogglePhase={() => toggleSet(setExpandedPhases, phase.phase)}
-            onToggleScope={(key: string) => toggleSet(setExpandedScopes, key)}
-            onToggleCategory={(key: string) => toggleSet(setExpandedCategories, key)}
-            onUpdate={onUpdate}
-          />
-        ))}
-      </tbody>
-    </table>
+    <div className="p-4">
+      <table className="w-full text-sm border-separate" style={{ borderSpacing: '0 2px' }}>
+        <thead className="sticky top-0 z-10">
+          <tr>
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-400 uppercase tracking-wider bg-[#f5f7fa]">
+              Scope / Criteria
+            </th>
+            <th className="text-left px-4 py-2.5 w-32 text-xs font-semibold text-gray-400 uppercase tracking-wider bg-[#f5f7fa]">
+              Assigned
+            </th>
+            <th className="text-left px-4 py-2.5 w-36 text-xs font-semibold text-gray-400 uppercase tracking-wider bg-[#f5f7fa]">
+              QA Status
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {phases.map(phase => (
+            <PhaseRows
+              key={phase.phase}
+              phase={phase}
+              filter={filter}
+              activeUser={activeUser}
+              expanded={expandedPhases.has(phase.phase)}
+              expandedScopes={expandedScopes}
+              expandedCategories={expandedCategories}
+              onTogglePhase={() => toggleSet(setExpandedPhases, phase.phase)}
+              onToggleScope={(key: string) => toggleSet(setExpandedScopes, key)}
+              onToggleCategory={(key: string) => toggleSet(setExpandedCategories, key)}
+              onUpdate={onUpdate}
+              onBatchUpdate={onBatchUpdate}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -85,29 +95,48 @@ interface PhaseRowsProps {
   onToggleScope: (key: string) => void
   onToggleCategory: (key: string) => void
   onUpdate: Props['onUpdate']
+  onBatchUpdate: Props['onBatchUpdate']
 }
 
 function PhaseRows({
   phase, filter, activeUser, expanded,
   expandedScopes, expandedCategories,
-  onTogglePhase, onToggleScope, onToggleCategory, onUpdate,
+  onTogglePhase, onToggleScope, onToggleCategory, onUpdate, onBatchUpdate,
 }: PhaseRowsProps) {
+  const pct = phase.stats.total > 0
+    ? Math.round((phase.stats.pass / phase.stats.total) * 100)
+    : 0
+
   return (
     <>
       <tr
-        className="bg-gray-50 cursor-pointer hover:bg-gray-100 border-b border-gray-200"
+        className="cursor-pointer group"
         onClick={onTogglePhase}
       >
-        <td className="px-4 py-2 font-semibold text-gray-800" colSpan={3}>
-          <span className="mr-2 text-gray-400">{expanded ? '▼' : '▶'}</span>
-          {phase.phase.toUpperCase()} — {phase.label.split(' — ')[1] || ''}
-          <span className="ml-3 text-xs font-normal text-gray-500">
-            {phase.stats.pass}/{phase.stats.total} verified
-          </span>
+        <td
+          className="px-4 py-3 font-bold text-red-900 bg-red-50 rounded-l-lg border-l-4 border-red-400"
+          colSpan={2}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-red-400 text-xs transition-transform duration-150" style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+              ▶
+            </span>
+            <span className="text-sm">{phase.label}</span>
+            <span className="text-xs font-normal text-red-400 ml-2">
+              {phase.stats.pass}/{phase.stats.total} verified
+            </span>
+          </div>
         </td>
-        <td className="px-4 py-2" />
-        <td className="px-4 py-2">
-          <MiniStats stats={phase.stats} />
+        <td className="px-4 py-3 bg-red-50 rounded-r-lg">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1.5 bg-red-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-red-400 rounded-full transition-all duration-300"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span className="text-xs font-medium text-red-400 w-8 text-right">{pct}%</span>
+          </div>
         </td>
       </tr>
       {expanded &&
@@ -127,6 +156,7 @@ function PhaseRows({
                 onToggleScope={() => onToggleScope(scopeKey)}
                 onToggleCategory={onToggleCategory}
                 onUpdate={onUpdate}
+                onBatchUpdate={onBatchUpdate}
               />
             )
           })}
@@ -146,41 +176,58 @@ interface ScopeRowsProps {
   onToggleScope: () => void
   onToggleCategory: (key: string) => void
   onUpdate: Props['onUpdate']
+  onBatchUpdate: Props['onBatchUpdate']
 }
 
 function ScopeRows({
   scope, phase, filter, activeUser, expanded,
-  expandedCategories, onToggleScope, onToggleCategory, onUpdate,
+  expandedCategories, onToggleScope, onToggleCategory, onUpdate, onBatchUpdate,
 }: ScopeRowsProps) {
   if (scope.criteriaStatus !== 'populated') {
     return (
-      <tr className="border-b border-gray-100">
-        <td className="px-4 py-2" />
-        <td className="px-4 py-2 text-gray-700 font-medium">{scope.label}</td>
-        <td className="px-4 py-2 text-gray-400 italic" colSpan={3}>
-          {scope.criteriaStatus === 'placeholder' ? 'No criteria yet (placeholder)' : 'No spec found'}
+      <tr>
+        <td className="pl-10 pr-4 py-2.5 text-gray-400 italic bg-white rounded-lg" colSpan={3}>
+          <span className="text-gray-600 font-medium mr-2">{scope.scopeIndex}. {scope.label}</span>
+          <span className="text-xs">
+            {scope.criteriaStatus === 'placeholder' ? '— No criteria yet' : '— No spec found'}
+          </span>
         </td>
       </tr>
     )
   }
 
+  const pct = scope.stats.total > 0
+    ? Math.round((scope.stats.pass / scope.stats.total) * 100)
+    : 0
+
   return (
     <>
       <tr
-        className="border-b border-gray-100 cursor-pointer hover:bg-gray-50"
+        className="cursor-pointer group"
         onClick={onToggleScope}
       >
-        <td className="px-4 py-2" />
-        <td className="px-4 py-2 text-gray-700 font-medium">
-          <span className="mr-2 text-gray-400 text-xs">{expanded ? '▼' : '▶'}</span>
-          {scope.label}
+        <td className="pl-10 pr-4 py-2.5 bg-white rounded-l-lg shadow-sm" colSpan={2}>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400 text-xs transition-transform duration-150" style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+              ▶
+            </span>
+            <span className="font-semibold text-gray-800">{scope.scopeIndex}. {scope.label}</span>
+            <span className="text-xs text-gray-400 ml-1">
+              {scope.stats.pass}/{scope.stats.total}
+            </span>
+            <StatusDots stats={scope.stats} />
+          </div>
         </td>
-        <td className="px-4 py-2 text-gray-500 text-xs">
-          {scope.stats.pass}/{scope.stats.total} verified
-        </td>
-        <td className="px-4 py-2" />
-        <td className="px-4 py-2">
-          <MiniStats stats={scope.stats} />
+        <td className="px-4 py-2.5 bg-white rounded-r-lg shadow-sm">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span className="text-xs text-gray-400 w-8 text-right">{pct}%</span>
+          </div>
         </td>
       </tr>
       {expanded &&
@@ -197,6 +244,7 @@ function ScopeRows({
                 expanded={expandedCategories.has(catKey)}
                 onToggle={() => onToggleCategory(catKey)}
                 onUpdate={onUpdate}
+                onBatchUpdate={onBatchUpdate}
               />
             )
           })}
@@ -213,30 +261,80 @@ interface CategoryRowsProps {
   expanded: boolean
   onToggle: () => void
   onUpdate: Props['onUpdate']
+  onBatchUpdate: Props['onBatchUpdate']
 }
 
-function CategoryRows({ category, filter, activeUser, expanded, onToggle, onUpdate }: CategoryRowsProps) {
+function CategoryRows({ category, filter, activeUser, expanded, onToggle, onUpdate, onBatchUpdate }: CategoryRowsProps) {
   const visibleCriteria = category.criteria.filter(c => matchesFilter(c, filter, activeUser))
-  const catStats = {
-    pass: category.criteria.filter(c => c.qaStatus === 'pass').length,
-    total: category.criteria.length,
+  const passCount = category.criteria.filter(c => c.qaStatus === 'pass').length
+  const totalCount = category.criteria.length
+
+  // Cascade: determine common assignee for display
+  const assignees = category.criteria.map(c => c.assignee).filter(Boolean)
+  const uniqueAssignees = new Set(assignees)
+  const commonAssignee = uniqueAssignees.size === 1 ? assignees[0] : ''
+
+  // Cascade: determine dominant QA status for display
+  const qaStatuses = category.criteria.map(c => c.qaStatus)
+  const uniqueQa = new Set(qaStatuses)
+  const commonQa = uniqueQa.size === 1 ? qaStatuses[0] : null
+
+  const handleCascadeAssignee = (value: string) => {
+    const keysToUpdate = category.criteria
+      .filter(c => !c.assignee)
+      .map(c => c.key)
+    if (keysToUpdate.length > 0) {
+      onBatchUpdate(keysToUpdate, { assignee: value })
+    }
+  }
+
+  const handleCascadeQa = (status: QaStatus) => {
+    const keysToUpdate = category.criteria
+      .filter(c => c.qaStatus === 'untested')
+      .map(c => c.key)
+    if (keysToUpdate.length > 0) {
+      onBatchUpdate(keysToUpdate, { qaStatus: status })
+    }
   }
 
   return (
     <>
       <tr
-        className="border-b border-gray-50 cursor-pointer hover:bg-gray-50"
+        className="cursor-pointer group"
         onClick={onToggle}
       >
-        <td className="px-4 py-1.5" />
-        <td className="px-4 py-1.5" />
-        <td className="px-4 py-1.5 pl-8">
-          <span className="mr-2 text-gray-400 text-xs">{expanded ? '▼' : '▶'}</span>
-          <span className="font-medium text-gray-700">{category.name}</span>
-          <span className="ml-2 text-xs text-gray-400">{catStats.pass}/{catStats.total}</span>
+        <td className="pl-16 pr-4 py-2 bg-gray-50/80 rounded-l-lg border-l-2 border-gray-200">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400 text-[10px] transition-transform duration-150" style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+              ▶
+            </span>
+            <span className="font-medium text-gray-700 text-sm">{category.name}</span>
+            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
+              {passCount}/{totalCount}
+            </span>
+          </div>
         </td>
-        <td className="px-4 py-1.5" />
-        <td className="px-4 py-1.5" />
+        <td className="px-4 py-2 bg-gray-50/80" onClick={e => e.stopPropagation()}>
+          <select
+            value={commonAssignee || ''}
+            onChange={e => handleCascadeAssignee(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white text-gray-600 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+          >
+            <option value="">
+              {uniqueAssignees.size > 1 ? 'Mixed...' : '—'}
+            </option>
+            {ASSIGNEE_OPTIONS.filter(a => a.value).map(a => (
+              <option key={a.value} value={a.value}>{a.label}</option>
+            ))}
+          </select>
+        </td>
+        <td className="px-4 py-2 bg-gray-50/80 rounded-r-lg" onClick={e => e.stopPropagation()}>
+          <QaStatusChips
+            value={commonQa}
+            onChange={handleCascadeQa}
+            showLabels
+          />
+        </td>
       </tr>
       {expanded &&
         visibleCriteria.map(criterion => (
@@ -260,91 +358,99 @@ interface CriterionRowProps {
 }
 
 function CriterionRow({ criterion, activeUser, onUpdate }: CriterionRowProps) {
-  const canEdit = !!activeUser
-
   return (
-    <tr className="border-b border-gray-50 hover:bg-blue-50/30">
-      <td className="px-4 py-1.5" />
-      <td className="px-4 py-1.5" />
-      <td className="px-4 py-1.5 pl-12">
-        <div className="text-gray-800 text-sm">
+    <tr className="group hover:bg-blue-50/40 transition-colors duration-100">
+      <td className="pl-20 pr-4 py-2.5 bg-white rounded-l-lg">
+        <div className="text-gray-700 text-sm leading-relaxed">
           {criterion.isNegative && (
-            <span className="text-red-500 text-xs font-medium mr-1">NOT:</span>
+            <span className="inline-flex items-center text-red-500 text-[10px] font-bold mr-1.5 bg-red-50 px-1.5 py-0.5 rounded uppercase">
+              Not
+            </span>
           )}
           {criterion.text}
         </div>
         {criterion.verifiedBy && (
-          <div className="text-xs text-gray-400 mt-0.5">
-            Verified by: {criterion.verifiedBy}
+          <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
+            <span className="text-emerald-500">✓</span> Verified by: {criterion.verifiedBy}
           </div>
         )}
       </td>
-      <td className="px-4 py-1.5">
+      <td className="px-4 py-2.5 bg-white">
         <select
           value={criterion.assignee || ''}
           onChange={e => onUpdate(criterion.key, { assignee: e.target.value || '' })}
-          disabled={!canEdit}
-          className="w-full border border-gray-200 rounded px-1.5 py-0.5 text-xs bg-white disabled:opacity-50"
+          className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white text-gray-700 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500/20 transition-colors"
         >
           {ASSIGNEE_OPTIONS.map(a => (
             <option key={a.value} value={a.value}>{a.label}</option>
           ))}
         </select>
       </td>
-      <td className="px-4 py-1.5">
-        <QaStatusSelect
+      <td className="px-4 py-2.5 bg-white rounded-r-lg">
+        <QaStatusChips
           value={criterion.qaStatus}
           onChange={(status) => onUpdate(criterion.key, { qaStatus: status })}
-          disabled={!canEdit}
         />
       </td>
     </tr>
   )
 }
 
-// ── QA Status select ──────────────────────────────────────────────────
+// ── QA Status chips ──────────────────────────────────────────────────
 
-function QaStatusSelect({
+function QaStatusChips({
   value,
   onChange,
-  disabled,
+  showLabels,
 }: {
-  value: QaStatus
+  value: QaStatus | null
   onChange: (status: QaStatus) => void
-  disabled: boolean
+  showLabels?: boolean
 }) {
-  const config = QA_STATUS_CONFIG[value]
-
   return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value as QaStatus)}
-      disabled={disabled}
-      className={`w-full rounded px-1.5 py-0.5 text-xs font-medium border-0 ${config.bg} ${config.text} disabled:opacity-50`}
-    >
-      {(Object.entries(QA_STATUS_CONFIG) as [QaStatus, typeof config][]).map(([status, cfg]) => (
-        <option key={status} value={status}>
-          {cfg.icon} {cfg.label}
-        </option>
-      ))}
-    </select>
+    <div className="inline-flex items-center gap-0.5 bg-gray-100/80 rounded-full p-0.5">
+      {QA_STATUSES.map(status => {
+        const cfg = QA_STATUS_CONFIG[status]
+        const isActive = value === status
+        return (
+          <button
+            key={status}
+            onClick={(e) => { e.stopPropagation(); onChange(status) }}
+            title={cfg.label}
+            className={`
+              rounded-full flex items-center justify-center text-xs font-medium
+              transition-all duration-150
+              ${showLabels ? 'px-2.5 py-1 gap-1' : 'w-7 h-7'}
+              ${isActive
+                ? `${cfg.bg} ${cfg.text} shadow-sm`
+                : 'text-gray-300 hover:text-gray-500 hover:bg-white/60'
+              }
+            `}
+          >
+            <span>{cfg.icon}</span>
+            {showLabels && isActive && <span className="text-[10px]">{cfg.label}</span>}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
-// ── Mini stats indicator ──────────────────────────────────────────────
+// ── Status dots ──────────────────────────────────────────────────────
 
-function MiniStats({ stats }: { stats: { total: number; pass: number; fail: number; blocked: number } }) {
+function StatusDots({ stats }: { stats: { total: number; pass: number; fail: number; blocked: number } }) {
   if (stats.total === 0) return null
   return (
-    <div className="flex gap-0.5">
-      {stats.pass > 0 && (
-        <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" title={`${stats.pass} pass`} />
-      )}
+    <div className="flex gap-1 ml-1">
       {stats.fail > 0 && (
-        <span className="inline-block w-2 h-2 rounded-full bg-red-500" title={`${stats.fail} fail`} />
+        <span className="inline-flex items-center gap-0.5 text-[10px] text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full font-medium">
+          {stats.fail} fail
+        </span>
       )}
       {stats.blocked > 0 && (
-        <span className="inline-block w-2 h-2 rounded-full bg-amber-500" title={`${stats.blocked} blocked`} />
+        <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full font-medium">
+          {stats.blocked} blocked
+        </span>
       )}
     </div>
   )

@@ -658,16 +658,22 @@ The spec and FRD are already approved:
 
 ## How to Run Each Step
 
-Each step MUST run as a separate \`claude -p\` session for context isolation. Use this exact command pattern for every step:
+Each step MUST run as a separate \`claude -p\` session for context isolation. For each step:
+
+1. Write the substituted prompt to a temp file
+2. Run \`claude -p\` reading from that file
 
 \`\`\`bash
-claude -p "$(sed 's|{{FEATURE}}|${feature}|g; s|{{SCOPE_DIR}}|${scopeDir}|g; s|{{BRANCH}}|${branch}|g; s|{{WORKSTREAM_ID}}|${scopeId}|g' _private/tools/vision/prompts/{TEMPLATE})" --add-dir "${scopeDir}" --max-turns {N} --output-format text 2>&1 | tee "${scopeDir}/{step}-output.log"
+sed 's|{{FEATURE}}|${feature}|g; s|{{SCOPE_DIR}}|${scopeDir}|g; s|{{BRANCH}}|${branch}|g; s|{{WORKSTREAM_ID}}|${scopeId}|g' _private/tools/vision/prompts/{TEMPLATE} > /tmp/pipeline-prompt.txt
+claude -p "$(cat /tmp/pipeline-prompt.txt)" --add-dir /Users/jakestein/tryps-docs --max-turns {N}
 \`\`\`
 
 CRITICAL:
-- \`--add-dir "${scopeDir}"\` is REQUIRED — without it the child session cannot read/write scope docs.
-- Set Bash timeout to 600000 (10 min) for each \`claude -p\` call. Steps 4 (Work) and 6 (Compound) may need up to 10 minutes.
-- Do NOT read the templates yourself — \`sed\` handles substitution. Just run the command.
+- \`--add-dir /Users/jakestein/tryps-docs\` is REQUIRED — without it the child session cannot read/write scope docs.
+- Do NOT use \`--output-format text\` — it causes the subprocess to buffer all output and appear frozen.
+- Do NOT pipe through \`tee\` — it can cause hangs.
+- Set Bash timeout to 600000 (10 min) for each \`claude -p\` call.
+- Do NOT read the templates yourself — \`sed\` handles substitution. Just run the commands above.
 - Do NOT open files in Marked 2 or any other app during Steps 3-6. Only open agent-ready.md after Step 7 completes.
 
 ## Steps (run in order)

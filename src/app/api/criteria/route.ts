@@ -14,6 +14,13 @@ interface OverlayRow {
   updated_at: string | null
 }
 
+interface WorkstreamRow {
+  id: string
+  name: string
+  parent_id: string | null
+  sort_order: number
+}
+
 export async function GET() {
   try {
     const db = getDatabase()
@@ -29,6 +36,21 @@ export async function GET() {
       overlayMap.set(row.criterion_key, row)
     }
 
+    // Load workstream sort orders from Gantt DB
+    const workstreamRows = db.prepare(
+      'SELECT id, name, parent_id, sort_order FROM workstreams WHERE parent_id IS NOT NULL ORDER BY sort_order'
+    ).all() as WorkstreamRow[]
+
+    // Build lookup: scope slug → { sortOrder, ganttName }
+    // Workstream IDs are like "p1-core-flows", scope slugs are like "core-flows"
+    const workstreamMap = new Map<string, { sortOrder: number; ganttName: string }>()
+    for (const ws of workstreamRows) {
+      // Extract scope slug from workstream ID (remove phase prefix like "p1-")
+      const slug = ws.id.replace(/^p\d+-/, '')
+      const phase = ws.parent_id?.replace(/-.*$/, '') || ''
+      workstreamMap.set(`${phase}/${slug}`, { sortOrder: ws.sort_order, ganttName: ws.name })
+    }
+
     // Group by phase
     const phaseMap = new Map<string, typeof scopes>()
     for (const scope of scopes) {
@@ -40,7 +62,15 @@ export async function GET() {
     const phases = Array.from(phaseMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([phase, phaseScopes]) => {
-        const scopeResults = phaseScopes.map((scope, idx) => {
+        // Sort scopes by Gantt sort_order, falling back to alphabetical
+        const sortedScopes = [...phaseScopes].sort((a, b) => {
+          const aOrder = workstreamMap.get(`${phase}/${a.scope}`)?.sortOrder ?? 999
+          const bOrder = workstreamMap.get(`${phase}/${b.scope}`)?.sortOrder ?? 999
+          if (aOrder !== bOrder) return aOrder - bOrder
+          return a.scope.localeCompare(b.scope)
+        })
+
+        const scopeResults = sortedScopes.map((scope, idx) => {
           // Group criteria by category
           const categoryMap = new Map<string, typeof scope.criteria>()
           for (const c of scope.criteria) {
@@ -79,9 +109,15 @@ export async function GET() {
             untested: allCriteria.filter(c => c.qaStatus === 'untested').length,
           }
 
+          // Use Gantt label if available, otherwise parsed label
+          const wsInfo = workstreamMap.get(`${phase}/${scope.scope}`)
+          const label = wsInfo
+            ? wsInfo.ganttName.replace(/^\d+\.\s*/, '')
+            : scope.scopeLabel
+
           return {
             scope: scope.scope,
-            label: scope.scopeLabel,
+            label,
             scopeIndex: idx + 1,
             criteriaStatus: scope.criteriaStatus,
             stats,

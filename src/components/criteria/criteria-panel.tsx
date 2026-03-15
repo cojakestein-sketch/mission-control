@@ -92,15 +92,27 @@ export function CriteriaPanel() {
     }
   }, [])
 
+  // Sync scopes ↔ workstreams on initial load
+  const runSync = useCallback(async () => {
+    try {
+      await fetch('/api/criteria/sync', { method: 'POST' })
+    } catch {
+      // sync is best-effort
+    }
+  }, [])
+
   useEffect(() => {
-    fetchCriteria()
-    fetchChangelog()
+    // Sync first, then fetch
+    runSync().then(() => {
+      fetchCriteria()
+      fetchChangelog()
+    })
     const interval = setInterval(() => {
       fetchCriteria()
       fetchChangelog()
     }, 120000)
     return () => clearInterval(interval)
-  }, [fetchCriteria, fetchChangelog])
+  }, [runSync, fetchCriteria, fetchChangelog])
 
   const handleUserChange = useCallback((user: string) => {
     setActiveUser(user)
@@ -204,6 +216,16 @@ export function CriteriaPanel() {
           </div>
           <div className="flex items-center gap-3">
             <CriteriaIdentityBar activeUser={activeUser} onUserChange={handleUserChange} />
+            <button
+              onClick={async () => {
+                await runSync()
+                await fetchCriteria()
+              }}
+              className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+              title="Sync scopes with Gantt & GitHub"
+            >
+              Sync
+            </button>
             <button
               onClick={() => setShowChangelog(!showChangelog)}
               className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${

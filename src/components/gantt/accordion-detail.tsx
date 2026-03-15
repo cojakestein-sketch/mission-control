@@ -82,7 +82,7 @@ function getStepGitHubUrl(stepKey: PipelineStepKey, pipeline: Workstream['pipeli
       plan: 'plan.md',
       work: 'work-log.md',
       review: 'review.md',
-      compound: 'compound-log.md',
+      compound: 'compound-learnings.md',
     }
     const fileName = stepFileMap[stepKey]
     if (fileName) {

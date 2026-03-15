@@ -24,10 +24,10 @@ const PIPELINE_STEPS: {
   { key: 'work', label: 'WORK', number: '4', color: '#d97706' },
   { key: 'review', label: 'REVIEW', number: '5', color: '#d97706' },
   { key: 'compound', label: 'COMPOUND LEARNINGS', number: '6', color: '#d97706' },
-  { key: 'merge_pr', label: 'AGENT READY FOR DEV REVIEW', number: '7', color: '#16a34a' },
-  { key: 'dev_feedback', label: 'DEV FEEDBACK', number: '8', color: '#dc2626' },
-  { key: 'post_dev_fixes', label: 'FIXES & LEARNINGS', number: '9', color: '#d97706' },
-  { key: 'merge_status', label: 'MERGED?', number: '10', color: '#16a34a' },
+  { key: 'merge_pr', label: 'PR READY', number: '7', color: '#16a34a' },
+  { key: 'dev_feedback', label: 'DEV REVIEW (NADEEM)', number: '8', color: '#dc2626' },
+  { key: 'post_dev_fixes', label: 'LEAD APPROVAL (ASIF)', number: '9', color: '#d97706' },
+  { key: 'merge_status', label: 'MERGED', number: '10', color: '#16a34a' },
 ]
 
 const COMPLETED_STATUSES = new Set([
@@ -74,6 +74,23 @@ function getStepGitHubUrl(stepKey: PipelineStepKey, pipeline: Workstream['pipeli
   if (stepKey === 'merge_pr') {
     const meta = pipeline.merge_pr?.meta as Record<string, unknown> | null
     return (meta?.prUrl as string) || null
+  }
+  // For pipeline steps that produce docs in the scope folder, link to the file in GitHub
+  const scopeBase = workstream.specPath?.replace(/\/spec\.md$/, '') || workstream.frdPath?.replace(/\/frd\.md$/, '')
+  if (scopeBase) {
+    const stepFileMap: Partial<Record<PipelineStepKey, string>> = {
+      plan: 'plan.md',
+      work: 'work-log.md',
+      review: 'review.md',
+      compound: 'compound-learnings.md',
+    }
+    const fileName = stepFileMap[stepKey]
+    if (fileName) {
+      const status = pipeline[stepKey]?.status
+      if (status && status !== 'not_started') {
+        return `https://github.com/${DOC_REPO}/blob/main/${scopeBase}/${fileName}`
+      }
+    }
   }
   return null
 }
@@ -605,11 +622,14 @@ function CopyPromptButton({ color, label, prompt }: { color: 'purple' | 'blue' |
 }
 
 function buildSpecPrompt(scopeName: string, scopeId: string, specPath: string): string {
+  // Extract phase number from scopeId (e.g., "p1-travel-dna" -> "1")
+  const phaseNum = scopeId.match(/^p(\d+)/)?.[1] || '?'
+
   return `You're starting the scope pipeline for "${scopeName}" (${scopeId}).
 
 Run /spec to interview me about this scope. I'll describe what I want and you'll write a structured spec with:
 - **Intent**: Why this scope exists (2-3 sentences)
-- **Acceptance Criteria**: Checkboxes for what "done" looks like
+- **Success Criteria**: Every criterion gets a unique ID using the format \`P${phaseNum}.S?.C{nn}\` (phase.scope.criterion — scope number will be assigned by the tracker). Number sequentially across all categories. Each criterion must have a "Verified by:" test script. Follow \`docs/frameworks/spec-criteria-framework.md\` for format rules, banned words, and testability checklist. **Zero Context Clarity Check: every criterion must be understandable by a tester or developer who was NOT in this interview. No internal names, no component names — describe what the user sees. "Verified by:" must be a test anyone can run with the app open.**
 - **Constraints**: Any technical or timeline constraints
 
 When the spec is complete:
@@ -619,7 +639,7 @@ When the spec is complete:
      -H "Content-Type: application/json" \\
      -d "$(jq -n --arg content "$(cat ${specPath})" --arg status ready --arg specPath "${specPath}" '{status: $status, content: $content, meta: {specPath: $specPath}}')"
 
-Then AUTOMATICALLY generate the FRD (Step 2) from the spec — expand my intent into detailed functional requirements: every screen, field, edge case, and API contract. Save the FRD into Mission Control's FRD pipeline section (see FRD prompt instructions).
+Then AUTOMATICALLY generate the FRD (Step 2) from the spec — expand my intent into detailed functional requirements: every screen, field, edge case, and API contract. Preserve all criterion IDs from the spec verbatim. Save the FRD into Mission Control's FRD pipeline section (see FRD prompt instructions).
 
 Let's go — start the interview.`
 }
@@ -634,7 +654,7 @@ Expand the spec into a detailed Functional Requirements Document:
 - Edge cases and error states
 - API contracts (endpoints, payloads)
 - Data model changes needed
-- Acceptance test scenarios
+- Success criteria copied verbatim with their IDs (P{X}.S{Y}.C{nn}) preserved
 
 When the FRD is complete, save it to BOTH locations:
 1. Save to tryps-docs repo at \`${frdPath}\` (for GitHub reference)
@@ -650,54 +670,59 @@ function buildAutonomousPipelinePrompt(scopeName: string, scopeId: string, scope
   const scopeDir = `/Users/jakestein/tryps-docs/scopes/${scopePath}`
   const branch = `feat/${feature}`
 
-  return `Run the autonomous scope pipeline for "${scopeName}" (${scopeId}), Steps 3 through 7.
+  return `Run the autonomous scope pipeline for "${scopeName}" (${scopeId}), Steps 3→7.
 
-Variables:
-- SCOPE_PATH="${scopePath}"
-- FEATURE="${feature}"
-- SCOPE_DIR="${scopeDir}"
-- BRANCH="${branch}"
-- WORKSTREAM_ID="${scopeId}"
+## Variables
 
-The spec and FRD are already approved:
-- ${scopeDir}/spec.md
-- ${scopeDir}/frd.md
+- FEATURE: ${feature}
+- SCOPE_DIR: ${scopeDir}
+- BRANCH: ${branch}
+- WORKSTREAM_ID: ${scopeId}
 
-For each step (3 through 7), run it as a separate \`claude -p\` session for context isolation.
-Use the prompt templates in \`_private/tools/vision/prompts/\`.
+## How It Works
 
-Step 3 (Plan): Use /workflows:plan with the FRD as input. template plan.md, --max-turns 30
-Verify: ${scopeDir}/plan.md exists and is >300 bytes.
+Use the **Agent tool** to run each step. Each agent is a full Opus session with its own context.
 
-Step 4 (Work): Use /workflows:work with the plan. template work.md, --max-turns 100
-Verify: branch ${branch} exists, ${scopeDir}/work.md exists, typecheck passed.
+For each step:
+1. **Check if output already exists** and passes verification — if yes, skip to the next step
+2. Read the template file from \`_private/tools/vision/prompts/{template}\`
+3. Replace all template variables: \`{{FEATURE}}\`, \`{{SCOPE_DIR}}\`, \`{{DIR}}\`, \`{{BRANCH}}\`, \`{{WORKSTREAM_ID}}\` with the values above (templates may use \`{{DIR}}\` or \`{{SCOPE_DIR}}\` — replace both with SCOPE_DIR value)
+4. Spawn an Agent with: \`model: "opus"\`, \`mode: "bypassPermissions"\`, the substituted template as the prompt
+5. Wait for the agent to complete
+6. Verify the output file exists
+7. Update Mission Control, print status, move to next step
 
-Step 5 (Review): Use /workflows:review for code quality, PLUS verify spec criteria. template review.md, --max-turns 40
-Verify: ${scopeDir}/review.md exists.
-If verdict is FAIL, re-run Step 4 with re-work prompt, then re-run Step 5. Max 2 retries.
+## Steps
 
-Step 6 (Compound): Fix P1/P2 issues, then use /workflows:compound for learnings. template compound.md, --max-turns 50
-Verify: ${scopeDir}/compound-learnings.md exists, typecheck passes.
+| # | Name | Template | Output | Skip If |
+|---|------|----------|--------|---------|
+| 3 | Plan | plan.md | ${scopeDir}/plan.md | Exists and >300 bytes |
+| 4 | Work | work.md | ${scopeDir}/work-log.md | Exists and branch \`${branch}\` exists |
+| 5 | Review | review.md | ${scopeDir}/review.md | Exists and not a placeholder |
+| 6 | Compound | compound.md | ${scopeDir}/compound-log.md | Exists and not a placeholder |
+| 7 | Agent Ready | agent-ready.md | ${scopeDir}/agent-ready.md | Contains a PR URL |
 
-Step 7 (Agent Ready): Create PR, ClickUp task, dev briefing. template agent-ready.md, --max-turns 20
-Verify: ${scopeDir}/agent-ready.md exists, PR URL is in file.
+If Step 5 review says FAIL, re-run Steps 4→5. Max 2 retries.
 
-For each step, substitute these variables in the template:
-- {{FEATURE}} → ${feature}
-- {{SCOPE_DIR}} → ${scopeDir}
-- {{BRANCH}} → ${branch}
-- {{WORKSTREAM_ID}} → ${scopeId}
+## After Each Step
 
-After each step, update Mission Control:
-curl -s -X PATCH -H "Authorization: Bearer $(cat ~/.mission-control-api-key)" -H "Content-Type: application/json" "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/{step_key}" -d '{"status": "{status}", "content": "..."}'
+\`\`\`bash
+curl -s -X PATCH -H "Authorization: Bearer $(cat ~/.mission-control-api-key)" -H "Content-Type: application/json" "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/{step_key}" -d '{"status": "complete"}'
+\`\`\`
 
-After each step print: [pipeline] ✓ Step N: {name} complete
-If failed: [pipeline] ✗ Step N: {name} FAILED — print last 20 lines of log, stop.
+Print: \`[pipeline] ✓ Step N: {name} complete\` or \`[pipeline] ✗ Step N: {name} FAILED\`
 
-After Step 7, print the final report with all artifact paths and PR URL.
-Open ${scopeDir}/agent-ready.md in Marked 2.
+## Rules
 
-Do NOT ask me anything. Run all steps autonomously.`
+- Do NOT open files in Marked 2 during Steps 3-6. Only open agent-ready.md after Step 7.
+- Do NOT ask me anything. Run all steps autonomously.
+- Each agent prompt must include: "Do NOT open files with open -a. Write files only."
+- All success criteria use IDs in the format P{X}.S{Y}.C{nn}. Preserve these IDs in all artifacts (plan, review, PR body, Slack notifications).
+
+## After Step 7
+
+Print the final report with all artifact paths and PR URL.
+Open ${scopeDir}/agent-ready.md in Marked 2.`
 }
 
 // Very simple markdown to HTML (headers, bold, lists, code)

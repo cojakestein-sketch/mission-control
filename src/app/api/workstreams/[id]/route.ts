@@ -15,6 +15,7 @@ export async function PATCH(
     const fields: string[] = []
     const values: unknown[] = []
 
+    if (body.parentId !== undefined) { fields.push('parent_id = ?'); values.push(body.parentId) }
     if (body.startDate !== undefined) { fields.push('start_date = ?'); values.push(body.startDate) }
     if (body.endDate !== undefined) { fields.push('end_date = ?'); values.push(body.endDate) }
     if (body.status !== undefined) { fields.push('status = ?'); values.push(body.status) }

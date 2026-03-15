@@ -29,6 +29,7 @@ const navGroups: NavGroup[] = [
     label: 'TRYPS',
     items: [
       { id: 'gantt', label: 'Gantt', icon: <GanttIcon />, priority: true },
+      { id: 'criteria', label: 'Criteria', icon: <CriteriaIcon />, priority: true },
       { id: 'tryps-team', label: 'Team', icon: <TrypsTeamIcon />, priority: true },
     ],
   },
@@ -1451,6 +1452,16 @@ function GanttIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M2 3h6M2 7h10M2 11h4M2 15h8" />
+    </svg>
+  )
+}
+
+function CriteriaIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3h10M3 7h10M3 11h10M3 15h10" />
+      <path d="M1 3l1.5 1.5L5 2" />
+      <path d="M1 7l1.5 1.5L5 6" />
     </svg>
   )
 }

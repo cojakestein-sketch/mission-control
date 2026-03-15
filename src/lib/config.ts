@@ -91,6 +91,9 @@ export const config = {
     process.env.OPENCLAW_SOUL_TEMPLATES_DIR ||
     (openclawStateDir ? path.join(openclawStateDir, 'templates', 'souls') : ''),
   homeDir: os.homedir(),
+  specsDir:
+    process.env.TRYPS_SPECS_DIR ||
+    path.join(process.cwd(), 'tryps-docs', 'scopes'),
   // Data retention (days). 0 = keep forever. Negative values are clamped to 0.
   retention: {
     activities: clampInt(Number(process.env.MC_RETAIN_ACTIVITIES_DAYS || '90'), 0, 3650, 90),

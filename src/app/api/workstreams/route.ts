@@ -219,12 +219,13 @@ export async function POST(request: Request) {
     const now = new Date().toISOString()
 
     db.prepare(`
-      INSERT INTO workstreams (id, name, category, assignee_id, start_date, end_date, status, color, frd_path, sort_order, deep_work_completed, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO workstreams (id, name, category, parent_id, assignee_id, start_date, end_date, status, color, frd_path, sort_order, deep_work_completed, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       body.name,
       body.category || 'scope',
+      body.parentId || null,
       body.assigneeId || null,
       body.startDate,
       body.endDate,

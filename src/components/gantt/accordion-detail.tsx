@@ -75,6 +75,23 @@ function getStepGitHubUrl(stepKey: PipelineStepKey, pipeline: Workstream['pipeli
     const meta = pipeline.merge_pr?.meta as Record<string, unknown> | null
     return (meta?.prUrl as string) || null
   }
+  // For pipeline steps that produce docs in the scope folder, link to the file in GitHub
+  const scopeBase = workstream.specPath?.replace(/\/spec\.md$/, '') || workstream.frdPath?.replace(/\/frd\.md$/, '')
+  if (scopeBase) {
+    const stepFileMap: Partial<Record<PipelineStepKey, string>> = {
+      plan: 'plan.md',
+      work: 'work-log.md',
+      review: 'review.md',
+      compound: 'compound-log.md',
+    }
+    const fileName = stepFileMap[stepKey]
+    if (fileName) {
+      const status = pipeline[stepKey]?.status
+      if (status && status !== 'not_started') {
+        return `https://github.com/${DOC_REPO}/blob/main/${scopeBase}/${fileName}`
+      }
+    }
+  }
   return null
 }
 

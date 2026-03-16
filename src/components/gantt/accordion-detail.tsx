@@ -18,16 +18,16 @@ const PIPELINE_STEPS: {
   conditional?: boolean
 }[] = [
   { key: 'spec', label: 'SPEC', number: '1', color: '#7c3aed' },
-  { key: 'frd', label: 'FRD', number: '2', color: '#2563eb' },
-  { key: 'design_screens', label: 'DESIGN SCREENS', number: '2a', color: '#db2777', conditional: true },
-  { key: 'plan', label: 'PLAN', number: '3', color: '#d97706' },
-  { key: 'work', label: 'WORK', number: '4', color: '#d97706' },
-  { key: 'review', label: 'REVIEW', number: '5', color: '#d97706' },
-  { key: 'compound', label: 'COMPOUND LEARNINGS', number: '6', color: '#d97706' },
-  { key: 'merge_pr', label: 'PR READY', number: '7', color: '#16a34a' },
-  { key: 'dev_feedback', label: 'DEV REVIEW (NADEEM)', number: '8', color: '#dc2626' },
-  { key: 'post_dev_fixes', label: 'LEAD APPROVAL (ASIF)', number: '9', color: '#d97706' },
-  { key: 'merge_status', label: 'MERGED', number: '10', color: '#16a34a' },
+  { key: 'design_screens', label: 'DESIGN SCREENS', number: '1a', color: '#db2777', conditional: true },
+  { key: 'plan', label: 'PLAN', number: '2', color: '#d97706' },
+  { key: 'work', label: 'WORK', number: '3', color: '#d97706' },
+  { key: 'review', label: 'REVIEW', number: '4', color: '#d97706' },
+  { key: 'compound', label: 'COMPOUND LEARNINGS', number: '5', color: '#d97706' },
+  { key: 'merge_pr', label: 'PR READY', number: '6', color: '#16a34a' },
+  { key: 'dev_feedback', label: 'DEV REVIEW', number: '7', color: '#dc2626' },
+  { key: 'merged', label: 'APPROVED & MERGED', number: '8', color: '#16a34a' },
+  { key: 'qa_testing', label: 'QA TESTING', number: '9', color: '#0891b2' },
+  { key: 'lessons_learned', label: 'LESSONS LEARNED', number: '10', color: '#7c3aed' },
 ]
 
 const COMPLETED_STATUSES = new Set([

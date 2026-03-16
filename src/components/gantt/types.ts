@@ -1,7 +1,8 @@
 export type PipelineStepKey =
   | 'spec' | 'frd' | 'design_screens' | 'plan' | 'work'
   | 'review' | 'compound' | 'merge_pr' | 'dev_feedback'
-  | 'post_dev_fixes' | 'merge_status'
+  | 'post_dev_fixes' | 'merge_status'  // legacy, kept for DB compat
+  | 'merged' | 'qa_testing' | 'lessons_learned'
 
 export interface ScopePipelineStep {
   id: string

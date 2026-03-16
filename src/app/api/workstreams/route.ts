@@ -60,9 +60,9 @@ interface PipelineStepRow {
 }
 
 const ALL_STEP_KEYS: PipelineStepKey[] = [
-  'spec', 'frd', 'design_screens', 'plan', 'work',
+  'spec', 'design_screens', 'plan', 'work',
   'review', 'compound', 'merge_pr', 'dev_feedback',
-  'post_dev_fixes', 'merge_status',
+  'merged', 'qa_testing', 'lessons_learned',
 ]
 
 function buildPipeline(

@@ -571,48 +571,77 @@ function buildAutonomousPipelinePrompt(scopeName: string, scopeId: string, scope
 - SCOPE_DIR: ${scopeDir}
 - BRANCH: ${branch}
 - WORKSTREAM_ID: ${scopeId}
+- BASE_BRANCH: develop
+- CLEAN: false
 
 ## How It Works
 
 Use the **Agent tool** to run each step. Each agent is a full Opus session with its own context.
 
+**IMPORTANT — Branch rules:**
+- ALL feature branches are created from \`develop\` (NEVER \`main\`). Main is production and may be weeks behind.
+- ALL PRs target \`develop\`.
+- ALL diffs compare against \`origin/develop\`.
+- Before PR creation, sync with develop: \`git fetch origin develop && git rebase origin/develop\`
+
+**If CLEAN is true** (re-run mode): Before starting, delete existing artifacts and branch:
+\`\`\`bash
+# Delete old artifacts
+rm -f ${scopeDir}/plan.md ${scopeDir}/work-log.md ${scopeDir}/review.md ${scopeDir}/compound-log.md ${scopeDir}/agent-ready.md
+# Delete old branch (local + remote)
+git branch -D ${branch} 2>/dev/null; git push origin --delete ${branch} 2>/dev/null
+# Close old PR if exists
+gh pr close ${branch} --repo cojakestein-sketch/tripful 2>/dev/null
+\`\`\`
+
 For each step:
 1. **Check if output already exists** and passes verification — if yes, skip to the next step
 2. Read the template file from \`_private/tools/vision/prompts/{template}\`
 3. Replace all template variables: \`{{FEATURE}}\`, \`{{SCOPE_DIR}}\`, \`{{DIR}}\`, \`{{BRANCH}}\`, \`{{WORKSTREAM_ID}}\` with the values above (templates may use \`{{DIR}}\` or \`{{SCOPE_DIR}}\` — replace both with SCOPE_DIR value)
-4. Spawn an Agent with: \`model: "opus"\`, \`mode: "bypassPermissions"\`, the substituted template as the prompt
-5. Wait for the agent to complete
-6. Verify the output file exists
-7. Update Mission Control, print status, move to next step
+4. Update Mission Control status to "awaiting" for the current step
+5. Spawn an Agent with: \`model: "opus"\`, \`mode: "bypassPermissions"\`, the substituted template as the prompt
+6. Wait for the agent to complete
+7. Verify the output file exists
+8. Update Mission Control status to "approved", print status, move to next step
 
 ## Steps
 
-| # | Name | Template | Output | Skip If |
-|---|------|----------|--------|---------|
-| 2 | Plan | plan.md | ${scopeDir}/plan.md | Exists and >300 bytes |
-| 3 | Work | work.md | ${scopeDir}/work-log.md | Exists and branch \`${branch}\` exists |
-| 4 | Review | review.md | ${scopeDir}/review.md | Exists and not a placeholder |
-| 5 | Compound | compound.md | ${scopeDir}/compound-log.md | Exists and not a placeholder |
-| 6 | Agent Ready | agent-ready.md | ${scopeDir}/agent-ready.md | Contains a PR URL |
+| # | Name | Template | Output | MC Step Key | Skip If |
+|---|------|----------|--------|-------------|---------|
+| 2 | Plan | plan.md | ${scopeDir}/plan.md | plan | Exists and >300 bytes |
+| 3 | Work | work.md | ${scopeDir}/work-log.md | work | Exists and branch \`${branch}\` exists |
+| 4 | Review | review.md | ${scopeDir}/review.md | review | Exists and not a placeholder |
+| 5 | Compound | compound.md | ${scopeDir}/compound-log.md | compound | Exists and not a placeholder |
+| 6 | Agent Ready | agent-ready.md | ${scopeDir}/agent-ready.md | merge_pr | Contains a PR URL |
 
 If Step 4 review says FAIL, re-run Steps 3→4. Max 2 retries.
 
-## After Each Step
+## Mission Control Updates
+
+Update MC at the **start** and **end** of each step:
 
 \`\`\`bash
-curl -s -X PATCH -H "Authorization: Bearer $(cat ~/.mission-control-api-key)" -H "Content-Type: application/json" "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/{step_key}" -d '{"status": "complete"}'
+# Start of step (status: awaiting)
+curl -s -X PATCH -H "x-api-key: $(cat ~/.mission-control-api-key)" -H "Content-Type: application/json" "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/{step_key}" -d '{"status": "awaiting"}'
+
+# End of step (status: approved + summary)
+curl -s -X PATCH -H "x-api-key: $(cat ~/.mission-control-api-key)" -H "Content-Type: application/json" "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/{step_key}" -d '{"status": "approved", "content": "[summary of what was done]"}'
+
+# On failure
+curl -s -X PATCH -H "x-api-key: $(cat ~/.mission-control-api-key)" -H "Content-Type: application/json" "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/{step_key}" -d '{"status": "fail", "content": "[error description]"}'
 \`\`\`
 
 Print: \`[pipeline] ✓ Step N: {name} complete\` or \`[pipeline] ✗ Step N: {name} FAILED\`
 
 ## Rules
 
-- Do NOT open files in Marked 2 during Steps 3-6. Only open agent-ready.md after Step 7.
+- **Branch from develop, PR to develop.** NEVER use main as base.
+- Do NOT open files in Marked 2 during Steps 2-5. Only open agent-ready.md after Step 6.
 - Do NOT ask me anything. Run all steps autonomously.
 - Each agent prompt must include: "Do NOT open files with open -a. Write files only."
 - All success criteria use IDs in the format P{X}.S{Y}.C{nn}. Preserve these IDs in all artifacts (plan, review, PR body, Slack notifications).
 
-## After Step 7
+## After Step 6
 
 Print the final report with all artifact paths and PR URL.
 Open ${scopeDir}/agent-ready.md in Marked 2.`

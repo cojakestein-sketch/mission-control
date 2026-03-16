@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import type { Workstream, ScopePipelineStep, PipelineStepKey } from './types'
 
 interface AccordionDetailProps {
   workstream: Workstream
   onTaskToggle: (taskId: string, newStatus: 'todo' | 'done') => void
-  onFrdLoaded?: (workstreamId: string, content: string) => void
 }
 
 // Pipeline step definitions
@@ -18,16 +17,15 @@ const PIPELINE_STEPS: {
   conditional?: boolean
 }[] = [
   { key: 'spec', label: 'SPEC', number: '1', color: '#7c3aed' },
-  { key: 'frd', label: 'FRD', number: '2', color: '#2563eb' },
-  { key: 'design_screens', label: 'DESIGN SCREENS', number: '2a', color: '#db2777', conditional: true },
-  { key: 'plan', label: 'PLAN', number: '3', color: '#d97706' },
-  { key: 'work', label: 'WORK', number: '4', color: '#d97706' },
-  { key: 'review', label: 'REVIEW', number: '5', color: '#d97706' },
-  { key: 'compound', label: 'COMPOUND LEARNINGS', number: '6', color: '#d97706' },
-  { key: 'merge_pr', label: 'PR READY', number: '7', color: '#16a34a' },
-  { key: 'dev_feedback', label: 'DEV REVIEW (NADEEM)', number: '8', color: '#dc2626' },
-  { key: 'post_dev_fixes', label: 'LEAD APPROVAL (ASIF)', number: '9', color: '#d97706' },
-  { key: 'merge_status', label: 'MERGED', number: '10', color: '#16a34a' },
+  { key: 'design_screens', label: 'DESIGN SCREENS', number: '1a', color: '#db2777', conditional: true },
+  { key: 'plan', label: 'PLAN', number: '2', color: '#d97706' },
+  { key: 'work', label: 'WORK', number: '3', color: '#d97706' },
+  { key: 'review', label: 'REVIEW', number: '4', color: '#d97706' },
+  { key: 'compound', label: 'COMPOUND LEARNINGS', number: '5', color: '#d97706' },
+  { key: 'merge_pr', label: 'PR READY', number: '6', color: '#16a34a' },
+  { key: 'dev_feedback', label: 'DEV REVIEW (NADEEM)', number: '7', color: '#dc2626' },
+  { key: 'post_dev_fixes', label: 'LEAD APPROVAL (ASIF)', number: '8', color: '#d97706' },
+  { key: 'merge_status', label: 'MERGED', number: '9', color: '#16a34a' },
 ]
 
 const COMPLETED_STATUSES = new Set([
@@ -66,11 +64,6 @@ function getStepGitHubUrl(stepKey: PipelineStepKey, pipeline: Workstream['pipeli
     const specPath = (meta?.specPath as string) || workstream.specPath
     if (specPath) return `https://github.com/${DOC_REPO}/blob/main/${specPath}`
   }
-  if (stepKey === 'frd') {
-    const meta = pipeline.frd?.meta as Record<string, unknown> | null
-    const frdPath = (meta?.frdPath as string) || workstream.frdPath
-    if (frdPath) return `https://github.com/${DOC_REPO}/blob/main/${frdPath}`
-  }
   if (stepKey === 'merge_pr') {
     const meta = pipeline.merge_pr?.meta as Record<string, unknown> | null
     return (meta?.prUrl as string) || null
@@ -95,11 +88,9 @@ function getStepGitHubUrl(stepKey: PipelineStepKey, pipeline: Workstream['pipeli
   return null
 }
 
-export function AccordionDetail({ workstream, onFrdLoaded }: AccordionDetailProps) {
+export function AccordionDetail({ workstream }: AccordionDetailProps) {
   const pipeline = workstream.pipeline
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
-  const [frdLoading, setFrdLoading] = useState(false)
-  const [frdFetched, setFrdFetched] = useState(false)
 
   // Determine which steps to show
   const visibleSteps = PIPELINE_STEPS.filter(step => {
@@ -131,27 +122,6 @@ export function AccordionDetail({ workstream, onFrdLoaded }: AccordionDetailProp
       return next
     })
   }, [])
-
-  // FRD lazy-fetch on expand
-  useEffect(() => {
-    if (!expandedSteps.has('frd')) return
-    const frdStep = pipeline.frd
-    const frdMeta = frdStep?.meta as Record<string, unknown> | null
-    const frdPath = frdMeta?.frdPath as string | undefined
-    if (frdPath && !frdStep?.content && !frdLoading && !frdFetched) {
-      setFrdLoading(true)
-      setFrdFetched(true)
-      fetch(`/api/frd/${workstream.id}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.frdContent) {
-            onFrdLoaded?.(workstream.id, data.frdContent)
-          }
-        })
-        .catch(() => {})
-        .finally(() => setFrdLoading(false))
-    }
-  }, [expandedSteps, pipeline.frd, workstream.id, frdLoading, frdFetched, onFrdLoaded])
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg mx-2 mb-2 overflow-hidden shadow-sm">
@@ -249,7 +219,6 @@ export function AccordionDetail({ workstream, onFrdLoaded }: AccordionDetailProp
                     stepKey={step.key}
                     step={pipelineStep}
                     workstream={workstream}
-                    frdLoading={frdLoading}
                   />
                 </div>
               )}
@@ -266,12 +235,10 @@ function StepContent({
   stepKey,
   step,
   workstream,
-  frdLoading,
 }: {
   stepKey: PipelineStepKey
   step: ScopePipelineStep | null
   workstream: Workstream
-  frdLoading: boolean
 }) {
   const meta = step?.meta as Record<string, unknown> | null
   const docRepo = 'cojakestein-sketch/tryps-docs'
@@ -300,58 +267,6 @@ function StepContent({
             prompt={buildSpecPrompt(workstream.name, workstream.id, specFileName)}
           />
           <p className="text-[9px] text-gray-400 mt-1.5">Copies a prompt to your clipboard. Paste into Claude Code.</p>
-        </div>
-      )
-    }
-
-    case 'frd': {
-      const frdPath = (meta?.frdPath as string) || workstream.frdPath
-      const frdContent = step?.content || workstream.frdContent
-      const specPath = (workstream.pipeline?.spec?.meta as Record<string, unknown> | null)?.specPath as string | undefined
-        || workstream.specPath
-      const frdFileName = frdPath || `scopes/${workstream.id}/frd.md`
-      const hasSpec = !!(workstream.pipeline?.spec?.content || workstream.specContent)
-
-      if (frdLoading) {
-        return (
-          <div className="flex items-center gap-2 text-xs text-gray-400">
-            <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Fetching FRD...
-          </div>
-        )
-      }
-
-      if (frdContent) {
-        return (
-          <div>
-            <div className="text-xs text-gray-700 max-h-48 overflow-y-auto prose prose-xs">
-              <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(frdContent) }} />
-            </div>
-          </div>
-        )
-      }
-
-      if (!hasSpec) {
-        return (
-          <div className="text-center py-3">
-            <p className="text-xs text-gray-400 mb-1">Complete the Spec first — the FRD is auto-generated from it.</p>
-            <p className="text-[9px] text-gray-400">The Spec interview prompt (Step 1) will auto-trigger FRD generation.</p>
-          </div>
-        )
-      }
-
-      return (
-        <div className="text-center py-3">
-          <p className="text-xs text-gray-400 mb-2">Spec is ready — generate the FRD and save it here</p>
-          <CopyPromptButton
-            color="blue"
-            label="Generate FRD"
-            prompt={buildFrdPrompt(workstream.name, workstream.id, specPath || '', frdFileName)}
-          />
-          <p className="text-[9px] text-gray-400 mt-1.5">Copies a prompt to your clipboard. Paste into Claude Code. The FRD will be saved into this pipeline section.</p>
         </div>
       )
     }
@@ -526,10 +441,10 @@ function StepContent({
 
         return (
           <div className="text-center py-3">
-            <p className="text-xs text-gray-400 mb-2">Spec &amp; FRD approved — run the autonomous pipeline</p>
+            <p className="text-xs text-gray-400 mb-2">Spec approved — run the autonomous pipeline</p>
             <CopyPromptButton
               color="amber"
-              label="Run Autonomous Pipeline (Steps 3→7)"
+              label="Run Autonomous Pipeline (Steps 2→6)"
               prompt={buildAutonomousPipelinePrompt(workstream.name, workstream.id, scopePath, scopeName)}
             />
             <p className="text-[9px] text-gray-400 mt-1.5">Copies prompt to clipboard. Paste into Claude Code. Runs Plan → Work → Review → Compound → PR autonomously.</p>
@@ -639,38 +554,16 @@ When the spec is complete:
      -H "Content-Type: application/json" \\
      -d "$(jq -n --arg content "$(cat ${specPath})" --arg status ready --arg specPath "${specPath}" '{status: $status, content: $content, meta: {specPath: $specPath}}')"
 
-Then AUTOMATICALLY generate the FRD (Step 2) from the spec — expand my intent into detailed functional requirements: every screen, field, edge case, and API contract. Preserve all criterion IDs from the spec verbatim. Save the FRD into Mission Control's FRD pipeline section (see FRD prompt instructions).
+After the spec is saved, suggest running /pencil (Step 1a) if the spec references UI screens, or the autonomous pipeline (Steps 2-6) if it's backend-only.
 
 Let's go — start the interview.`
-}
-
-function buildFrdPrompt(scopeName: string, scopeId: string, specPath: string, frdPath: string): string {
-  return `Generate the FRD for "${scopeName}" (${scopeId}).
-
-Read the spec at \`${specPath}\` in the tryps-docs repo (or fetch from Mission Control: GET https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/spec).
-
-Expand the spec into a detailed Functional Requirements Document:
-- Every screen referenced (with field lists)
-- Edge cases and error states
-- API contracts (endpoints, payloads)
-- Data model changes needed
-- Success criteria copied verbatim with their IDs (P{X}.S{Y}.C{nn}) preserved
-
-When the FRD is complete, save it to BOTH locations:
-1. Save to tryps-docs repo at \`${frdPath}\` (for GitHub reference)
-2. Save into Mission Control's FRD pipeline section so it's immediately visible:
-   curl -X PATCH "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/frd" \\
-     -H "Content-Type: application/json" \\
-     -d "$(jq -n --arg content "$(cat ${frdPath})" --arg status ready --arg frdPath "${frdPath}" '{status: $status, content: $content, meta: {frdPath: $frdPath}}')"
-
-After the FRD is saved, continue the pipeline: suggest running /pencil (Step 2a) if the FRD references UI screens, or /lfg (Steps 3-6) if it's backend-only.`
 }
 
 function buildAutonomousPipelinePrompt(scopeName: string, scopeId: string, scopePath: string, feature: string): string {
   const scopeDir = `/Users/jakestein/tryps-docs/scopes/${scopePath}`
   const branch = `feat/${feature}`
 
-  return `Run the autonomous scope pipeline for "${scopeName}" (${scopeId}), Steps 3→7.
+  return `Run the autonomous scope pipeline for "${scopeName}" (${scopeId}), Steps 2→6.
 
 ## Variables
 
@@ -696,13 +589,13 @@ For each step:
 
 | # | Name | Template | Output | Skip If |
 |---|------|----------|--------|---------|
-| 3 | Plan | plan.md | ${scopeDir}/plan.md | Exists and >300 bytes |
-| 4 | Work | work.md | ${scopeDir}/work-log.md | Exists and branch \`${branch}\` exists |
-| 5 | Review | review.md | ${scopeDir}/review.md | Exists and not a placeholder |
-| 6 | Compound | compound.md | ${scopeDir}/compound-log.md | Exists and not a placeholder |
-| 7 | Agent Ready | agent-ready.md | ${scopeDir}/agent-ready.md | Contains a PR URL |
+| 2 | Plan | plan.md | ${scopeDir}/plan.md | Exists and >300 bytes |
+| 3 | Work | work.md | ${scopeDir}/work-log.md | Exists and branch \`${branch}\` exists |
+| 4 | Review | review.md | ${scopeDir}/review.md | Exists and not a placeholder |
+| 5 | Compound | compound.md | ${scopeDir}/compound-log.md | Exists and not a placeholder |
+| 6 | Agent Ready | agent-ready.md | ${scopeDir}/agent-ready.md | Contains a PR URL |
 
-If Step 5 review says FAIL, re-run Steps 4→5. Max 2 retries.
+If Step 4 review says FAIL, re-run Steps 3→4. Max 2 retries.
 
 ## After Each Step
 

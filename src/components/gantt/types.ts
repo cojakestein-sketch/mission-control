@@ -2,6 +2,7 @@ export type PipelineStepKey =
   | 'spec' | 'frd' | 'design_screens' | 'plan' | 'work'
   | 'review' | 'compound' | 'merge_pr' | 'dev_feedback'
   | 'post_dev_fixes' | 'merge_status'
+  // Note: 'frd' kept for DB backwards compat but removed from UI pipeline
 
 export interface ScopePipelineStep {
   id: string

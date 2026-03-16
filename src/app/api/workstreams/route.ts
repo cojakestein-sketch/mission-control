@@ -60,7 +60,7 @@ interface PipelineStepRow {
 }
 
 const ALL_STEP_KEYS: PipelineStepKey[] = [
-  'spec', 'frd', 'design_screens', 'plan', 'work',
+  'spec', 'design_screens', 'plan', 'work',
   'review', 'compound', 'merge_pr', 'dev_feedback',
   'post_dev_fixes', 'merge_status',
 ]
@@ -94,17 +94,6 @@ function buildPipeline(
         content: ws.spec_content,
         generatedAt: null,
         meta: ws.spec_path ? { specPath: ws.spec_path } : null,
-        updatedAt: ws.updated_at,
-      }
-    } else if (key === 'frd') {
-      pipeline[key] = {
-        id: `fallback-${ws.id}-frd`,
-        workstreamId: ws.id,
-        stepKey: 'frd',
-        status: ws.frd_content ? 'ready' : ws.frd_path ? 'draft' : 'empty',
-        content: ws.frd_content,
-        generatedAt: null,
-        meta: ws.frd_path ? { frdPath: ws.frd_path } : null,
         updatedAt: ws.updated_at,
       }
     } else {

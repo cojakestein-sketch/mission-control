@@ -23,9 +23,10 @@ const PIPELINE_STEPS: {
   { key: 'review', label: 'REVIEW', number: '4', color: '#d97706' },
   { key: 'compound', label: 'COMPOUND LEARNINGS', number: '5', color: '#d97706' },
   { key: 'merge_pr', label: 'PR READY', number: '6', color: '#16a34a' },
-  { key: 'dev_feedback', label: 'DEV REVIEW (NADEEM)', number: '7', color: '#dc2626' },
-  { key: 'post_dev_fixes', label: 'LEAD APPROVAL (ASIF)', number: '8', color: '#d97706' },
-  { key: 'merge_status', label: 'MERGED', number: '9', color: '#16a34a' },
+  { key: 'dev_feedback', label: 'DEV REVIEW', number: '7', color: '#dc2626' },
+  { key: 'merged', label: 'APPROVED & MERGED', number: '8', color: '#16a34a' },
+  { key: 'qa_testing', label: 'QA TESTING', number: '9', color: '#0891b2' },
+  { key: 'lessons_learned', label: 'LESSONS LEARNED', number: '10', color: '#7c3aed' },
 ]
 
 const COMPLETED_STATUSES = new Set([

@@ -6,7 +6,8 @@ export const dynamic = 'force-dynamic'
 const VALID_STEP_KEYS = new Set([
   'spec', 'frd', 'design_screens', 'plan', 'work',
   'review', 'compound', 'merge_pr', 'dev_feedback',
-  'post_dev_fixes', 'merge_status',
+  'post_dev_fixes', 'merge_status',  // legacy keys kept for backwards compat
+  'merged', 'qa_testing', 'lessons_learned',
 ])
 
 /**

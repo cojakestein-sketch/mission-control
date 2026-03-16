@@ -160,7 +160,16 @@ export function proxy(request: NextRequest) {
       || allowedPatterns.some((pattern) => hostMatches(pattern, hostName))
     )
 
-  if (!isAllowedHost) {
+  // API-key-authenticated requests bypass the host allowlist.
+  // The host check defends against DNS rebinding (browser-based attacks using
+  // ambient cookies). Programmatic callers that present a valid API key or
+  // agent key are not vulnerable to DNS rebinding, so blocking them only
+  // causes false-positive 403s when a reverse proxy (e.g. Caddy) forwards
+  // requests under a public hostname not listed in MC_ALLOWED_HOSTS.
+  const apiKey = extractApiKeyFromRequest(request)
+  const hasApiKeyHeader = Boolean(apiKey)
+
+  if (!isAllowedHost && !hasApiKeyHeader) {
     return addSecurityHeaders(new NextResponse('Forbidden', { status: 403 }), request)
   }
 
@@ -195,7 +204,6 @@ export function proxy(request: NextRequest) {
   // API routes: accept session cookie OR API key
   if (pathname.startsWith('/api/')) {
     const configuredApiKey = (process.env.API_KEY || '').trim()
-    const apiKey = extractApiKeyFromRequest(request)
     const hasValidApiKey = Boolean(configuredApiKey && apiKey && safeCompare(apiKey, configuredApiKey))
 
     // Agent-scoped keys are validated in route auth (DB-backed) and should be

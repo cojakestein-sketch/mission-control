@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import type { Workstream, ScopePipelineStep, PipelineStepKey } from './types'
 
 interface AccordionDetailProps {
   workstream: Workstream
   onTaskToggle: (taskId: string, newStatus: 'todo' | 'done') => void
-  onFrdLoaded?: (workstreamId: string, content: string) => void
 }
 
 // Pipeline step definitions
@@ -66,23 +65,18 @@ function getStepGitHubUrl(stepKey: PipelineStepKey, pipeline: Workstream['pipeli
     const specPath = (meta?.specPath as string) || workstream.specPath
     if (specPath) return `https://github.com/${DOC_REPO}/blob/main/${specPath}`
   }
-  if (stepKey === 'frd') {
-    const meta = pipeline.frd?.meta as Record<string, unknown> | null
-    const frdPath = (meta?.frdPath as string) || workstream.frdPath
-    if (frdPath) return `https://github.com/${DOC_REPO}/blob/main/${frdPath}`
-  }
   if (stepKey === 'merge_pr') {
     const meta = pipeline.merge_pr?.meta as Record<string, unknown> | null
     return (meta?.prUrl as string) || null
   }
   // For pipeline steps that produce docs in the scope folder, link to the file in GitHub
-  const scopeBase = workstream.specPath?.replace(/\/spec\.md$/, '') || workstream.frdPath?.replace(/\/frd\.md$/, '')
+  const scopeBase = workstream.specPath?.replace(/\/spec\.md$/, '')
   if (scopeBase) {
     const stepFileMap: Partial<Record<PipelineStepKey, string>> = {
       plan: 'plan.md',
       work: 'work-log.md',
       review: 'review.md',
-      compound: 'compound-learnings.md',
+      compound: 'compound-log.md',
     }
     const fileName = stepFileMap[stepKey]
     if (fileName) {
@@ -95,11 +89,9 @@ function getStepGitHubUrl(stepKey: PipelineStepKey, pipeline: Workstream['pipeli
   return null
 }
 
-export function AccordionDetail({ workstream, onFrdLoaded }: AccordionDetailProps) {
+export function AccordionDetail({ workstream }: { workstream: Workstream; onTaskToggle: (taskId: string, newStatus: 'todo' | 'done') => void }) {
   const pipeline = workstream.pipeline
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
-  const [frdLoading, setFrdLoading] = useState(false)
-  const [frdFetched, setFrdFetched] = useState(false)
 
   // Determine which steps to show
   const visibleSteps = PIPELINE_STEPS.filter(step => {
@@ -131,27 +123,6 @@ export function AccordionDetail({ workstream, onFrdLoaded }: AccordionDetailProp
       return next
     })
   }, [])
-
-  // FRD lazy-fetch on expand
-  useEffect(() => {
-    if (!expandedSteps.has('frd')) return
-    const frdStep = pipeline.frd
-    const frdMeta = frdStep?.meta as Record<string, unknown> | null
-    const frdPath = frdMeta?.frdPath as string | undefined
-    if (frdPath && !frdStep?.content && !frdLoading && !frdFetched) {
-      setFrdLoading(true)
-      setFrdFetched(true)
-      fetch(`/api/frd/${workstream.id}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.frdContent) {
-            onFrdLoaded?.(workstream.id, data.frdContent)
-          }
-        })
-        .catch(() => {})
-        .finally(() => setFrdLoading(false))
-    }
-  }, [expandedSteps, pipeline.frd, workstream.id, frdLoading, frdFetched, onFrdLoaded])
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg mx-2 mb-2 overflow-hidden shadow-sm">
@@ -249,7 +220,6 @@ export function AccordionDetail({ workstream, onFrdLoaded }: AccordionDetailProp
                     stepKey={step.key}
                     step={pipelineStep}
                     workstream={workstream}
-                    frdLoading={frdLoading}
                   />
                 </div>
               )}
@@ -266,12 +236,10 @@ function StepContent({
   stepKey,
   step,
   workstream,
-  frdLoading,
 }: {
   stepKey: PipelineStepKey
   step: ScopePipelineStep | null
   workstream: Workstream
-  frdLoading: boolean
 }) {
   const meta = step?.meta as Record<string, unknown> | null
   const docRepo = 'cojakestein-sketch/tryps-docs'
@@ -300,58 +268,6 @@ function StepContent({
             prompt={buildSpecPrompt(workstream.name, workstream.id, specFileName)}
           />
           <p className="text-[9px] text-gray-400 mt-1.5">Copies a prompt to your clipboard. Paste into Claude Code.</p>
-        </div>
-      )
-    }
-
-    case 'frd': {
-      const frdPath = (meta?.frdPath as string) || workstream.frdPath
-      const frdContent = step?.content || workstream.frdContent
-      const specPath = (workstream.pipeline?.spec?.meta as Record<string, unknown> | null)?.specPath as string | undefined
-        || workstream.specPath
-      const frdFileName = frdPath || `scopes/${workstream.id}/frd.md`
-      const hasSpec = !!(workstream.pipeline?.spec?.content || workstream.specContent)
-
-      if (frdLoading) {
-        return (
-          <div className="flex items-center gap-2 text-xs text-gray-400">
-            <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Fetching FRD...
-          </div>
-        )
-      }
-
-      if (frdContent) {
-        return (
-          <div>
-            <div className="text-xs text-gray-700 max-h-48 overflow-y-auto prose prose-xs">
-              <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(frdContent) }} />
-            </div>
-          </div>
-        )
-      }
-
-      if (!hasSpec) {
-        return (
-          <div className="text-center py-3">
-            <p className="text-xs text-gray-400 mb-1">Complete the Spec first — the FRD is auto-generated from it.</p>
-            <p className="text-[9px] text-gray-400">The Spec interview prompt (Step 1) will auto-trigger FRD generation.</p>
-          </div>
-        )
-      }
-
-      return (
-        <div className="text-center py-3">
-          <p className="text-xs text-gray-400 mb-2">Spec is ready — generate the FRD and save it here</p>
-          <CopyPromptButton
-            color="blue"
-            label="Generate FRD"
-            prompt={buildFrdPrompt(workstream.name, workstream.id, specPath || '', frdFileName)}
-          />
-          <p className="text-[9px] text-gray-400 mt-1.5">Copies a prompt to your clipboard. Paste into Claude Code. The FRD will be saved into this pipeline section.</p>
         </div>
       )
     }
@@ -526,10 +442,10 @@ function StepContent({
 
         return (
           <div className="text-center py-3">
-            <p className="text-xs text-gray-400 mb-2">Spec &amp; FRD approved — run the autonomous pipeline</p>
+            <p className="text-xs text-gray-400 mb-2">Spec approved — run the autonomous pipeline</p>
             <CopyPromptButton
               color="amber"
-              label="Run Autonomous Pipeline (Steps 3→7)"
+              label="Run Autonomous Pipeline (Steps 2→6)"
               prompt={buildAutonomousPipelinePrompt(workstream.name, workstream.id, scopePath, scopeName)}
             />
             <p className="text-[9px] text-gray-400 mt-1.5">Copies prompt to clipboard. Paste into Claude Code. Runs Plan → Work → Review → Compound → PR autonomously.</p>
@@ -637,86 +553,90 @@ When the spec is complete:
 2. Update Mission Control's pipeline so it appears in the SPEC section:
    curl -X PATCH "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/spec" \\
      -H "Content-Type: application/json" \\
+     -H "x-api-key: $(cat ~/.mission-control-api-key | tr -d '\\n\\r ')" \\
+     -H "x-original-host: localhost" \\
      -d "$(jq -n --arg content "$(cat ${specPath})" --arg status ready --arg specPath "${specPath}" '{status: $status, content: $content, meta: {specPath: $specPath}}')"
 
-Then AUTOMATICALLY generate the FRD (Step 2) from the spec — expand my intent into detailed functional requirements: every screen, field, edge case, and API contract. Preserve all criterion IDs from the spec verbatim. Save the FRD into Mission Control's FRD pipeline section (see FRD prompt instructions).
+After the spec is saved, suggest running the autonomous pipeline (Steps 2→6) to generate Plan → Work → Review → Compound → PR.
 
 Let's go — start the interview.`
-}
-
-function buildFrdPrompt(scopeName: string, scopeId: string, specPath: string, frdPath: string): string {
-  return `Generate the FRD for "${scopeName}" (${scopeId}).
-
-Read the spec at \`${specPath}\` in the tryps-docs repo (or fetch from Mission Control: GET https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/spec).
-
-Expand the spec into a detailed Functional Requirements Document:
-- Every screen referenced (with field lists)
-- Edge cases and error states
-- API contracts (endpoints, payloads)
-- Data model changes needed
-- Success criteria copied verbatim with their IDs (P{X}.S{Y}.C{nn}) preserved
-
-When the FRD is complete, save it to BOTH locations:
-1. Save to tryps-docs repo at \`${frdPath}\` (for GitHub reference)
-2. Save into Mission Control's FRD pipeline section so it's immediately visible:
-   curl -X PATCH "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/frd" \\
-     -H "Content-Type: application/json" \\
-     -d "$(jq -n --arg content "$(cat ${frdPath})" --arg status ready --arg frdPath "${frdPath}" '{status: $status, content: $content, meta: {frdPath: $frdPath}}')"
-
-After the FRD is saved, continue the pipeline: suggest running /pencil (Step 2a) if the FRD references UI screens, or /lfg (Steps 3-6) if it's backend-only.`
 }
 
 function buildAutonomousPipelinePrompt(scopeName: string, scopeId: string, scopePath: string, feature: string): string {
   const scopeDir = `/Users/jakestein/tryps-docs/scopes/${scopePath}`
   const branch = `feat/${feature}`
 
-  return `Run the autonomous scope pipeline for "${scopeName}" (${scopeId}), Steps 3→7.
+  return `Run the autonomous scope pipeline for "${scopeName}" (${scopeId}), Steps 2→6.
 
-## Variables
+  ## Variables
 
-- FEATURE: ${feature}
-- SCOPE_DIR: ${scopeDir}
-- BRANCH: ${branch}
-- WORKSTREAM_ID: ${scopeId}
+  - FEATURE: ${feature}
+  - SCOPE_DIR: ${scopeDir}
+  - BRANCH: ${branch}
+  - WORKSTREAM_ID: ${scopeId}
+  - BASE_BRANCH: develop
+  - CLEAN: true
 
-## How It Works
+  ## How It Works
 
-Use the **Agent tool** to run each step. Each agent is a full Opus session with its own context.
+  Use the **Agent tool** to run each step. Each agent is a full Opus session with its own context.
 
-For each step:
-1. **Check if output already exists** and passes verification — if yes, skip to the next step
-2. Read the template file from \`_private/tools/vision/prompts/{template}\`
-3. Replace all template variables: \`{{FEATURE}}\`, \`{{SCOPE_DIR}}\`, \`{{DIR}}\`, \`{{BRANCH}}\`, \`{{WORKSTREAM_ID}}\` with the values above (templates may use \`{{DIR}}\` or \`{{SCOPE_DIR}}\` — replace both with SCOPE_DIR value)
-4. Spawn an Agent with: \`model: "opus"\`, \`mode: "bypassPermissions"\`, the substituted template as the prompt
-5. Wait for the agent to complete
-6. Verify the output file exists
-7. Update Mission Control, print status, move to next step
+  **IMPORTANT — Branch rules:**
+  - ALL feature branches are created from \`develop\` (NEVER \`main\`). Main is production and may be weeks behind.
+  - ALL PRs target \`develop\`.
+  - ALL diffs compare against \`origin/develop\`.
+  - Before PR creation, sync with develop: \`git fetch origin develop && git rebase origin/develop\`
 
-## Steps
+  **CLEAN is true** — Before starting, run this cleanup:
+  \`\`\`bash
+  git fetch origin develop
+  rm -f ${scopeDir}/plan.md ${scopeDir}/work-log.md ${scopeDir}/review.md ${scopeDir}/compound-log.md ${scopeDir}/agent-ready.md
+  git branch -D ${branch} 2>/dev/null; git push origin --delete ${branch} 2>/dev/null
+  gh pr close ${branch} --repo cojakestein-sketch/tryps 2>/dev/null
+  \`\`\`
 
-| # | Name | Template | Output | Skip If |
-|---|------|----------|--------|---------|
-| 3 | Plan | plan.md | ${scopeDir}/plan.md | Exists and >300 bytes |
-| 4 | Work | work.md | ${scopeDir}/work-log.md | Exists and branch \`${branch}\` exists |
-| 5 | Review | review.md | ${scopeDir}/review.md | Exists and not a placeholder |
-| 6 | Compound | compound.md | ${scopeDir}/compound-log.md | Exists and not a placeholder |
-| 7 | Agent Ready | agent-ready.md | ${scopeDir}/agent-ready.md | Contains a PR URL |
+  For each step:
+  1. Check if output already exists and passes verification — if yes, skip to the next step
+  2. Construct the agent prompt based on the step requirements (read spec, plan, etc.)
+  3. Update Mission Control status to "awaiting" for the current step. If MC update fails, log it and move on — do NOT debug.
+  4. Spawn an Agent with: \`model: "opus"\`, \`mode: "bypassPermissions"\`, the prompt
+  5. Wait for the agent to complete
+  6. Verify the output file exists
+  7. Update Mission Control status to "approved", print status, move to next step. If MC update fails, log it and move on.
 
-If Step 5 review says FAIL, re-run Steps 4→5. Max 2 retries.
+  ## Steps
 
-## After Each Step
+  | # | Name | Output | MC Key | Skip If |
+  |---|------|--------|--------|---------|
+  | 2 | Plan | ${scopeDir}/plan.md | plan | Exists and >300 bytes |
+  | 3 | Work | ${scopeDir}/work-log.md | work | Exists and branch \`${branch}\` exists |
+  | 4 | Review | ${scopeDir}/review.md | review | Exists and not a placeholder |
+  | 5 | Compound | ${scopeDir}/compound-log.md | compound | Exists and not a placeholder |
+  | 6 | Agent Ready | ${scopeDir}/agent-ready.md | merge_pr | Contains a PR URL |
 
-\`\`\`bash
-curl -s -X PATCH -H "Authorization: Bearer $(cat ~/.mission-control-api-key)" -H "Content-Type: application/json" "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/{step_key}" -d '{"status": "complete"}'
-\`\`\`
+  If Step 4 review says FAIL, re-run Steps 3→4. Max 2 retries.
 
-Print: \`[pipeline] ✓ Step N: {name} complete\` or \`[pipeline] ✗ Step N: {name} FAILED\`
+  ## Mission Control Updates
 
-## Rules
+  \`\`\`bash
+  # Start of step
+  curl -s -o /dev/null -X PATCH -H "x-api-key: $(cat ~/.mission-control-api-key | tr -d '\\n\\r ')" -H "x-original-host: localhost" -H "Content-Type: application/json" "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/{step_key}" -d '{"status": "awaiting"}'
 
-- Do NOT open files in Marked 2 during Steps 3-6. Only open agent-ready.md after Step 7.
-- Do NOT ask me anything. Run all steps autonomously.
-- Each agent prompt must include: "Do NOT open files with open -a. Write files only."
+  # End of step
+  curl -s -o /dev/null -X PATCH -H "x-api-key: $(cat ~/.mission-control-api-key | tr -d '\\n\\r ')" -H "x-original-host: localhost" -H "Content-Type: application/json" "https://mc.jointryps.com/api/workstreams/${scopeId}/pipeline/{step_key}" -d '{"status": "approved", "content": "[summary]"}'
+  \`\`\`
+
+  ## Rules
+
+  - Branch from develop, PR to develop. NEVER use main as base.
+  - Do NOT open files in Marked 2 during Steps 2-5. Only open agent-ready.md after Step 6.
+  - Do NOT ask me anything. Run all steps autonomously.
+  - Each agent prompt must include: "Do NOT open files with open -a. Write files only."
+  - If MC update fails, log it and continue. Do NOT spend tool calls debugging MC.
+  - All success criteria use IDs in the format P{X}.S{Y}.C{nn}. Preserve these IDs in all artifacts.
+  - Figma screens are not yet designed. Create placeholder screens and note to devs that UI may adjust when Figma designs arrive.
+
+  After Step 6: Print the final report with all artifact paths and PR URL. Open agent-ready.md in Marked 2.
 - All success criteria use IDs in the format P{X}.S{Y}.C{nn}. Preserve these IDs in all artifacts (plan, review, PR body, Slack notifications).
 
 ## After Step 7

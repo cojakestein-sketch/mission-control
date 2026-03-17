@@ -87,7 +87,6 @@ interface GanttChartProps {
   onTaskToggle: (taskId: string, newStatus: 'todo' | 'done') => void
   onStatusChange?: (workstreamId: string, newStatus: string) => void
   onDragReschedule?: (workstreamId: string, newStart: string, newEnd: string) => void
-  onFrdLoaded?: (workstreamId: string, content: string) => void
 }
 
 const LABEL_WIDTH = 220
@@ -104,7 +103,7 @@ const horizontalOnly: Modifier = ({ transform }) => ({
 // Toast state (module-level for simplicity)
 let toastTimeout: ReturnType<typeof setTimeout> | null = null
 
-export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragReschedule, onFrdLoaded }: GanttChartProps) {
+export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragReschedule }: GanttChartProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
@@ -415,8 +414,7 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
                         isExpanded={expandedIds.has(phase.id)}
                         onToggle={() => toggleExpand(phase.id)}
                         onTaskToggle={onTaskToggle}
-                        onFrdLoaded={onFrdLoaded}
-                        isDragging={activeDragId === phase.id}
+                                                isDragging={activeDragId === phase.id}
                         dragDeltaX={activeDragId === phase.id ? dragDeltaX : 0}
                       />
                       {!isPhaseCollapsed && childScopes.map((ws, idx) => (
@@ -429,8 +427,7 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
                           isExpanded={expandedIds.has(ws.id)}
                           onToggle={() => toggleExpand(ws.id)}
                           onTaskToggle={onTaskToggle}
-                          onFrdLoaded={onFrdLoaded}
-                          isDragging={activeDragId === ws.id}
+                                                    isDragging={activeDragId === ws.id}
                           dragDeltaX={activeDragId === ws.id ? dragDeltaX : 0}
                         />
                       ))}
@@ -452,8 +449,7 @@ export function GanttChart({ workstreams, onTaskToggle, onStatusChange, onDragRe
                         isExpanded={expandedIds.has(ws.id)}
                         onToggle={() => toggleExpand(ws.id)}
                         onTaskToggle={onTaskToggle}
-                        onFrdLoaded={onFrdLoaded}
-                        isDragging={activeDragId === ws.id}
+                                                isDragging={activeDragId === ws.id}
                         dragDeltaX={activeDragId === ws.id ? dragDeltaX : 0}
                       />
                     ))}
@@ -564,7 +560,6 @@ function WorkstreamRow({
   isExpanded,
   onToggle,
   onTaskToggle,
-  onFrdLoaded,
   isDragging,
   dragDeltaX,
 }: {
@@ -575,7 +570,6 @@ function WorkstreamRow({
   isExpanded: boolean
   onToggle: () => void
   onTaskToggle: (taskId: string, newStatus: 'todo' | 'done') => void
-  onFrdLoaded?: (workstreamId: string, content: string) => void
   isDragging: boolean
   dragDeltaX: number
 }) {
@@ -617,7 +611,7 @@ function WorkstreamRow({
       {isExpanded && (
         <div className="relative">
           <div className="px-2 pb-2">
-            <AccordionDetail workstream={workstream} onTaskToggle={onTaskToggle} onFrdLoaded={onFrdLoaded} />
+            <AccordionDetail workstream={workstream} onTaskToggle={onTaskToggle} />
           </div>
         </div>
       )}

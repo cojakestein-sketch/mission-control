@@ -21,6 +21,7 @@ const PHASE_PARENTS: Record<string, string> = {
   p3: 'p3-agents',
   p4: 'p4-brand-gtm',
   p5: 'p5-v2-beta',
+  reports: 'reports',
 }
 
 function slugToLabel(slug: string): string {

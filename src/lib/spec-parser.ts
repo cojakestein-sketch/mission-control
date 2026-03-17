@@ -40,6 +40,7 @@ function phaseLabel(phase: string): string {
     p3: 'Phase 3 — Agent Layer',
     p4: 'Phase 4 — Brand & GTM',
     p5: 'Phase 5 — V2 Beta',
+    reports: 'Daily Reports — Jake',
   }
   return labels[phase] || phase.toUpperCase()
 }
@@ -165,7 +166,7 @@ export function parseAllSpecs(specsDir: string): ParsedScope[] {
 
   const phases = readdirSync(specsDir).filter(d => {
     const full = join(specsDir, d)
-    return statSync(full).isDirectory() && /^p\d+$/.test(d)
+    return statSync(full).isDirectory() && (/^p\d+$/.test(d) || d === 'reports')
   })
 
   for (const phase of phases.sort()) {

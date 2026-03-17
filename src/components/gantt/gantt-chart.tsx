@@ -16,7 +16,71 @@ import { TimeAxis } from './time-axis'
 import { ChevronBar } from './chevron-bar'
 import { AccordionDetail } from './accordion-detail'
 import { VerticalMarker } from './today-marker'
-import type { Workstream, GanttRange } from './types'
+import type { Workstream, GanttRange, PipelineStepKey } from './types'
+
+const PIPELINE_STEP_ORDER: PipelineStepKey[] = [
+  'spec', 'design_screens', 'plan', 'work', 'review',
+  'compound', 'merge_pr', 'dev_feedback', 'merged',
+  'qa_testing', 'lessons_learned',
+]
+
+const STEP_LABELS: Record<string, string> = {
+  spec: 'SPEC', design_screens: 'DESIGN', plan: 'PLAN', work: 'WORK',
+  review: 'REVIEW', compound: 'COMPOUND', merge_pr: 'PR READY',
+  dev_feedback: 'DEV REVIEW', merged: 'MERGING', qa_testing: 'QA',
+  lessons_learned: 'LESSONS',
+}
+
+const COMPLETED_STEP_STATUSES = new Set([
+  'ready', 'complete', 'pass', 'submitted', 'approved', 'closed', 'dev-ready', 'pr_merged',
+])
+
+function getPipelineStepLabel(workstream: Workstream): string {
+  const pipeline = workstream.pipeline
+  if (!pipeline) return 'TODO'
+
+  // Find the first non-completed step
+  let lastCompleted: PipelineStepKey | null = null
+  for (const step of PIPELINE_STEP_ORDER) {
+    const s = pipeline[step]
+    if (s && COMPLETED_STEP_STATUSES.has(s.status)) {
+      lastCompleted = step
+    } else if (s && s.status && s.status !== 'not_started') {
+      // Currently in-progress step
+      return STEP_LABELS[step] || step.toUpperCase()
+    } else {
+      break
+    }
+  }
+
+  if (lastCompleted) {
+    const idx = PIPELINE_STEP_ORDER.indexOf(lastCompleted)
+    if (idx === PIPELINE_STEP_ORDER.length - 1) return 'DONE'
+    const nextStep = PIPELINE_STEP_ORDER[idx + 1]
+    return STEP_LABELS[nextStep] || nextStep.toUpperCase()
+  }
+
+  return 'SPEC'
+}
+
+function getPipelineStepColor(label: string): string {
+  const colors: Record<string, string> = {
+    'SPEC': 'bg-purple-100 text-purple-700',
+    'DESIGN': 'bg-pink-100 text-pink-700',
+    'PLAN': 'bg-amber-100 text-amber-700',
+    'WORK': 'bg-amber-100 text-amber-700',
+    'REVIEW': 'bg-amber-100 text-amber-700',
+    'COMPOUND': 'bg-amber-100 text-amber-700',
+    'PR READY': 'bg-green-100 text-green-700',
+    'DEV REVIEW': 'bg-red-100 text-red-700',
+    'MERGING': 'bg-green-100 text-green-700',
+    'QA': 'bg-cyan-100 text-cyan-700',
+    'LESSONS': 'bg-purple-100 text-purple-700',
+    'DONE': 'bg-green-100 text-green-700',
+    'TODO': 'bg-gray-200 text-gray-600',
+  }
+  return colors[label] || 'bg-gray-200 text-gray-600'
+}
 
 interface GanttChartProps {
   workstreams: Workstream[]
@@ -426,6 +490,8 @@ function WorkstreamLabel({
   onStatusClick: (e: React.MouseEvent) => void
   isChild?: boolean
 }) {
+  const isScope = workstream.category === 'scope'
+  const pipelineLabel = isScope ? getPipelineStepLabel(workstream) : null
   const statusColors: Record<string, string> = {
     not_started: 'bg-gray-200 text-gray-600',
     in_progress: 'bg-blue-100 text-blue-700',
@@ -468,12 +534,18 @@ function WorkstreamLabel({
 
         <button
           onClick={onStatusClick}
-          className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${statusColors[workstream.status] || statusColors.not_started}`}
-          title="Click to cycle status"
+          className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+            isScope && pipelineLabel
+              ? getPipelineStepColor(pipelineLabel)
+              : statusColors[workstream.status] || statusColors.not_started
+          }`}
+          title={isScope ? `Pipeline: ${pipelineLabel}` : 'Click to cycle status'}
         >
-          {workstream.status === 'not_started' ? 'TODO' :
-           workstream.status === 'in_progress' ? 'WIP' :
-           workstream.status === 'blocked' ? 'BLOCKED' : 'DONE'}
+          {isScope && pipelineLabel
+            ? pipelineLabel
+            : workstream.status === 'not_started' ? 'TODO'
+            : workstream.status === 'in_progress' ? 'WIP'
+            : workstream.status === 'blocked' ? 'BLOCKED' : 'DONE'}
         </button>
       </div>
 
